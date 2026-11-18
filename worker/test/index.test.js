@@ -8,13 +8,13 @@ const now = Date.parse("2026-11-18T12:00:00Z");
 test("parses recent RSS headlines and decodes feed text", () => {
   const xml = `<?xml version="1.0"?>
     <rss><channel><item>
-      <title><![CDATA[Breaking: Storm &amp; flooding]]></title>
+      <title><![CDATA[Breaking: Storm &amp; flooding &amp;#8212; alert]]></title>
       <link>https://example.com/storm</link>
       <pubDate>Wed, 18 Nov 2026 11:45:00 GMT</pubDate>
     </item></channel></rss>`;
 
   assert.deepEqual(parseFeed(xml, "Example News", now), [{
-    title: "Breaking: Storm & flooding",
+    title: "Breaking: Storm & flooding — alert",
     link: "https://example.com/storm",
     outlet: "Example News",
     published_at: "2026-11-18T11:45:00.000Z",

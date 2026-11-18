@@ -39,6 +39,15 @@ function plainText(value) {
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#(x[0-9a-f]+|\d+);/gi, (_, code) => {
+      const point = code[0].toLowerCase() === "x"
+        ? Number.parseInt(code.slice(1), 16)
+        : Number.parseInt(code, 10);
+      return Number.isFinite(point) && point > 0 && point <= 0x10ffff
+        && (point < 0xd800 || point > 0xdfff)
+        ? String.fromCodePoint(point)
+        : " ";
+    })
     .replace(/\s+/g, " ")
     .trim();
 }
