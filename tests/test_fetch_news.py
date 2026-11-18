@@ -138,15 +138,20 @@ class DashboardTests(unittest.TestCase):
         )
 
     def test_rendered_article_images_are_lazy_and_escaped(self):
-        story = Story([self.article(
-            "Story with an image",
-            "Outlet",
+        local_story = Story([self.article(
+            "Atlanta story with an image",
+            "Local Outlet",
             local_news=True,
         )])
-        story.latest.image_url = "https://images.example.com/story.jpg?size=large&crop=1"
-        page = render_page([(story, "us")], self.now)
-        self.assertIn('<article class="story story--with-image">', page)
-        self.assertIn(".section--atlanta .story--with-image", page)
+        local_story.latest.image_url = "https://images.example.com/story.jpg?size=large&crop=1"
+        regional_story = Story([self.article("Regional story with an image", "Regional Outlet")])
+        regional_story.latest.image_url = "https://images.example.com/regional.jpg"
+        page = render_page(
+            [(local_story, "us"), (regional_story, "us")],
+            self.now,
+        )
+        self.assertEqual(page.count('<article class="story story--with-image">'), 2)
+        self.assertIn(".story--with-image { display: grid;", page)
         self.assertIn(
             '<img class="story-image" src="https://images.example.com/story.jpg?size=large&amp;crop=1" '
             'alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">',
