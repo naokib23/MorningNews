@@ -5,6 +5,7 @@ from fetch_news import (
     Article,
     Story,
     cluster_articles,
+    clean_summary,
     group_sections,
     is_us_related,
     rank_stories,
@@ -16,7 +17,7 @@ class DashboardTests(unittest.TestCase):
     def setUp(self):
         self.now = datetime(2026, 11, 18, 12, 0, tzinfo=timezone.utc)
 
-    def article(self, title, outlet, hours_ago=0, us_focused=False):
+    def article(self, title, outlet, hours_ago=0, us_focused=False, summary=""):
         from datetime import timedelta
 
         return Article(
@@ -25,6 +26,7 @@ class DashboardTests(unittest.TestCase):
             outlet=outlet,
             us_focused=us_focused,
             published=self.now - timedelta(hours=hours_ago),
+            summary=summary,
         )
 
     def test_clusters_similar_titles_from_distinct_outlets(self):
@@ -45,13 +47,22 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(ranked[0][1], "us")
 
     def test_html_escapes_untrusted_headlines_and_links(self):
-        story = Story([self.article('<script>alert("x")</script>', "Outlet")])
+        story = Story([
+            self.article('<script>alert("x")</script>', "Outlet", summary='<b>feed summary</b>')
+        ])
         page = render_page([(story, "us")], self.now)
         self.assertNotIn("<script>", page)
         self.assertIn("&lt;script&gt;", page)
-        self.assertNotIn('<p class="summary">', page)
+        self.assertIn("&lt;b&gt;feed summary&lt;/b&gt;", page)
+        self.assertIn('<p class="summary">', page)
         self.assertIn("color-scheme: dark", page)
         self.assertIn("#0d1117", page)
+
+    def test_feed_summaries_are_cleaned_and_capped(self):
+        self.assertEqual(clean_summary("<p>Short &amp; useful.</p>"), "Short & useful.")
+        clipped = clean_summary("A useful feed summary. " * 10, limit=40)
+        self.assertLessEqual(len(clipped), 40)
+        self.assertTrue(clipped.endswith("…"))
 
     def test_us_keywords_use_word_boundaries(self):
         self.assertTrue(is_us_related("Congress debates a new bill", ["Congress"]))

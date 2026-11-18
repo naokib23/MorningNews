@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a static, headline-only news dashboard from configured RSS feeds."""
+"""Build a static news dashboard from configured RSS feeds."""
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ STOP_WORDS = {
 }
 MAX_ARTICLES_PER_FEED = 25
 MAX_AGE_HOURS = 72
+MAX_SUMMARY_CHARS = 220
 MIN_OUTLETS_FOR_REGIONAL_SECTIONS = 3
 MAX_VISIBLE_PER_SECTION = 10
 REGION_NAMES = {
@@ -45,6 +46,7 @@ class Article:
     outlet: str
     us_focused: bool
     published: datetime
+    summary: str = ""
 
     @property
     def tokens(self) -> set[str]:
@@ -82,6 +84,24 @@ def safe_link(value: str) -> str:
         return ""
 
 
+def clean_feed_text(value: str) -> str:
+    value = re.sub(r"(?is)<(script|style)\b[^>]*>.*?</\1>", " ", value)
+    value = re.sub(r"(?s)<[^>]*>", " ", value)
+    value = html.unescape(value)
+    value = re.sub(r"(?s)<[^>]*>", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def clean_summary(value: str, limit: int = MAX_SUMMARY_CHARS) -> str:
+    text = clean_feed_text(value)
+    if len(text) <= limit:
+        return text
+    end = text.rfind(" ", 0, limit - 1)
+    if end < limit // 2:
+        end = limit - 1
+    return text[:end].rstrip(" ,;:-") + "…"
+
+
 def fetch_feed(feed: dict, timeout: int = 12) -> list[Article]:
     request = urllib.request.Request(
         feed["url"],
@@ -93,7 +113,7 @@ def fetch_feed(feed: dict, timeout: int = 12) -> list[Article]:
     now = datetime.now(timezone.utc)
     articles = []
     for entry in parsed.entries[:MAX_ARTICLES_PER_FEED]:
-        title = html.unescape(re.sub(r"<[^>]*>", "", str(entry.get("title", "")))).strip()
+        title = clean_feed_text(str(entry.get("title", "")))
         if not title:
             continue
         published = parse_date(entry, now)
@@ -105,6 +125,7 @@ def fetch_feed(feed: dict, timeout: int = 12) -> list[Article]:
             outlet=feed["name"],
             us_focused=bool(feed.get("us_focused", False)),
             published=published,
+            summary=clean_summary(str(entry.get("summary", ""))),
         ))
     return articles
 
@@ -217,9 +238,11 @@ def render_card(story: Story, region: str, small_news: bool = False) -> str:
             tags.append(REGION_NAMES[region])
         tags.append("Under-covered" if count < MIN_OUTLETS_FOR_REGIONAL_SECTIONS else "Other world")
         badges = "".join(f'<span class="badge">{html.escape(tag)}</span>' for tag in tags)
+    summary = html.escape(article.summary) if article.summary else "No summary provided by this feed."
     return (
         '<article class="story">'
         f'<h3>{badges}{linked_title}</h3>'
+        f'<p class="summary">{summary}</p>'
         f'<p class="meta">{count} {outlet_label} · {html.escape(outlets)}</p>'
         '</article>'
     )
@@ -310,6 +333,7 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
     .story h3 {{ margin: 0; font-size: 1rem; line-height: 1.45; font-weight: 650; }}
     .story a {{ color: #e6edf3; text-decoration: none; }}
     .story a:active {{ color: var(--accent); }}
+    .summary {{ margin: 8px 0 0; color: #c9d1d9; font-size: .88rem; line-height: 1.55; }}
     .meta {{ margin: 9px 0 0; color: #8b949e; font-size: .76rem; line-height: 1.5; }}
     .badge {{ display: inline-block; margin: 0 6px 4px 0; border: 1px solid #30363d; border-radius: 999px; padding: 3px 8px; color: var(--accent); background: #21262d; font-size: .65rem; font-weight: 700; vertical-align: 2px; white-space: nowrap; }}
     .empty {{ background: #161b22; border: 1px solid #30363d; border-radius: 13px; padding: 16px; color: #8b949e; font-size: .85rem; }}
@@ -322,7 +346,7 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
   <main>
     <header>
       <h1>Top News</h1>
-      <p>Regional headlines ranked by how many outlets cover them, plus stories worth a closer look.</p>
+      <p>Regional headlines ranked by outlet coverage, with brief context from each feed.</p>
     </header>
     <nav class="section-nav" aria-label="News sections">
       <a href="#us">US</a>
@@ -331,7 +355,7 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
       <a href="#worth-a-look">Worth a look</a>
     </nav>
     {content}
-    <footer>Updated {html.escape(timestamp)} · Stories are grouped by headline similarity; region labels are inferred from headline keywords.</footer>
+    <footer>Updated {html.escape(timestamp)} · Summaries come from RSS/Atom feeds; region labels are inferred from headlines.</footer>
   </main>
 </body>
 </html>
