@@ -28,6 +28,14 @@ STOP_WORDS = {
 }
 MAX_ARTICLES_PER_FEED = 25
 MAX_AGE_HOURS = 72
+MIN_OUTLETS_FOR_REGIONAL_SECTIONS = 3
+MAX_VISIBLE_PER_SECTION = 10
+REGION_NAMES = {
+    "us": "US",
+    "europe": "Europe",
+    "middle_east": "Middle East",
+    "other": "Other world",
+}
 
 
 @dataclass
@@ -114,13 +122,17 @@ def similar_titles(left: Article, right: Article) -> bool:
     return SequenceMatcher(None, " ".join(sorted(left_tokens)), " ".join(sorted(right_tokens))).ratio() >= 0.78
 
 
-def is_us_related(title: str, keywords: list[str]) -> bool:
+def contains_keywords(title: str, keywords: list[str]) -> bool:
     normalized = " ".join(re.findall(r"[a-z0-9]+", title.lower()))
     return any(
         f" {keyword_normalized} " in f" {normalized} "
         for keyword in keywords
         if (keyword_normalized := " ".join(re.findall(r"[a-z0-9]+", keyword.lower())))
     )
+
+
+def is_us_related(title: str, keywords: list[str]) -> bool:
+    return contains_keywords(title, keywords)
 
 
 def cluster_articles(articles: list[Article]) -> list[Story]:
@@ -138,8 +150,29 @@ def cluster_articles(articles: list[Article]) -> list[Story]:
     return stories
 
 
-def rank_stories(stories: list[Story], keywords: list[str], now: datetime | None = None) -> list[tuple[Story, bool]]:
+def classify_region(
+    story: Story,
+    us_keywords: list[str],
+    region_keywords: dict[str, list[str]],
+) -> str:
+    titles = [article.title for article in story.articles]
+    # Explicit European or Middle Eastern references outweigh incidental US mentions.
+    for region in ("middle_east", "europe"):
+        if any(contains_keywords(title, region_keywords.get(region, [])) for title in titles):
+            return region
+    if any(is_us_related(title, us_keywords) for title in titles):
+        return "us"
+    return "other"
+
+
+def rank_stories(
+    stories: list[Story],
+    keywords: list[str],
+    now: datetime | None = None,
+    region_keywords: dict[str, list[str]] | None = None,
+) -> list[tuple[Story, str]]:
     now = now or datetime.now(timezone.utc)
+    region_keywords = region_keywords or {}
 
     def score(story: Story) -> tuple[float, int, datetime]:
         latest = story.latest
@@ -154,27 +187,94 @@ def rank_stories(stories: list[Story], keywords: list[str], now: datetime | None
 
     ranked = sorted(stories, key=score, reverse=True)
     return [
-        (story, any(is_us_related(article.title, keywords) for article in story.articles))
+        (story, classify_region(story, keywords, region_keywords))
         for story in ranked
     ]
 
 
-def render_page(ranked_stories: list[tuple[Story, bool]], updated: datetime) -> str:
-    cards = []
-    for story, us_related in ranked_stories[:30]:
-        article = story.latest
-        title = html.escape(article.title)
-        linked_title = f'<a href="{html.escape(article.link, quote=True)}" rel="noopener noreferrer">{title}</a>' if article.link else title
-        outlets = ", ".join(sorted(story.outlets))
-        us_label = '<span class="badge">US-related</span> ' if us_related else ""
-        cards.append(
-            '<article class="story">'
-            f'<h2>{us_label}{linked_title}</h2>'
-            f'<p class="meta">{len(story.outlets)} outlets · {html.escape(outlets)}</p>'
-            '</article>'
+def group_sections(ranked_stories: list[tuple[Story, str]]) -> tuple[dict[str, list[Story]], list[tuple[Story, str]]]:
+    sections = {"us": [], "europe": [], "middle_east": []}
+    worth_a_look = []
+    for story, region in ranked_stories:
+        if len(story.outlets) < MIN_OUTLETS_FOR_REGIONAL_SECTIONS or region == "other":
+            worth_a_look.append((story, region))
+        else:
+            sections[region].append(story)
+    return sections, worth_a_look
+
+
+def render_card(story: Story, region: str, small_news: bool = False) -> str:
+    article = story.latest
+    title = html.escape(article.title)
+    linked_title = f'<a href="{html.escape(article.link, quote=True)}" rel="noopener noreferrer">{title}</a>' if article.link else title
+    outlets = ", ".join(sorted(story.outlets))
+    count = len(story.outlets)
+    outlet_label = "outlet" if count == 1 else "outlets"
+    badges = ""
+    if small_news:
+        tags = []
+        if region != "other":
+            tags.append(REGION_NAMES[region])
+        tags.append("Under-covered" if count < MIN_OUTLETS_FOR_REGIONAL_SECTIONS else "Other world")
+        badges = "".join(f'<span class="badge">{html.escape(tag)}</span>' for tag in tags)
+    return (
+        '<article class="story">'
+        f'<h3>{badges}{linked_title}</h3>'
+        f'<p class="meta">{count} {outlet_label} · {html.escape(outlets)}</p>'
+        '</article>'
+    )
+
+
+def render_section(
+    section_id: str,
+    title: str,
+    description: str,
+    stories: list[tuple[Story, str]],
+    small_news: bool = False,
+) -> str:
+    visible = stories[:MAX_VISIBLE_PER_SECTION]
+    cards = "\n".join(render_card(story, region, small_news) for story, region in visible)
+    if len(stories) > len(visible):
+        more_cards = "\n".join(
+            render_card(story, region, small_news)
+            for story, region in stories[len(visible):]
         )
-    empty = '<p class="empty">No recent headlines are available. The next update will try again.</p>'
-    content = "\n".join(cards) if cards else empty
+        cards += (
+            '<details class="more">'
+            f'<summary>Show {len(stories) - len(visible)} more</summary>'
+            f'{more_cards}'
+            '</details>'
+        )
+    if not stories:
+        cards = '<p class="empty">No recent headlines in this section.</p>'
+    return (
+        f'<section class="news-section section--{section_id}" id="{section_id}" aria-labelledby="{section_id}-title">'
+        '<div class="section-heading">'
+        '<div>'
+        f'<h2 id="{section_id}-title">{title}</h2>'
+        f'<p>{description}</p>'
+        '</div>'
+        f'<span class="section-count" aria-label="{len(stories)} headlines">{len(stories)}</span>'
+        '</div>'
+        f'{cards}'
+        '</section>'
+    )
+
+
+def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> str:
+    sections, worth_a_look = group_sections(ranked_stories)
+    content = "\n".join([
+        render_section("us", "US", "The most widely covered US stories.", [(story, "us") for story in sections["us"]]),
+        render_section("europe", "Europe", "Major stories from across Europe.", [(story, "europe") for story in sections["europe"]]),
+        render_section("middle-east", "Middle East", "Major stories from across the Middle East.", [(story, "middle_east") for story in sections["middle_east"]]),
+        render_section(
+            "worth-a-look",
+            "Worth a look",
+            "Stories covered by fewer outlets, plus notable headlines outside these regions.",
+            worth_a_look,
+            small_news=True,
+        ),
+    ])
     timestamp = updated.strftime("%b %d, %Y at %H:%M UTC")
     return f"""<!doctype html>
 <html lang="en">
@@ -188,31 +288,49 @@ def render_page(ranked_stories: list[tuple[Story, bool]], updated: datetime) -> 
   <link rel="manifest" href="manifest.webmanifest">
   <title>Top News</title>
   <style>
-    :root {{ color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f3f5f8; color: #172033; }}
+    :root {{ color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f2f5f9; color: #182538; scroll-behavior: smooth; }}
     * {{ box-sizing: border-box; }}
     body {{ margin: 0; padding: max(20px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }}
     main {{ max-width: 760px; margin: 0 auto; }}
-    header {{ padding: 18px 4px 20px; }}
-    h1 {{ margin: 0; font-size: clamp(1.7rem, 7vw, 2.3rem); letter-spacing: -.04em; }}
-    header p {{ margin: 8px 0 0; color: #627087; font-size: .9rem; }}
-    .story {{ background: white; border: 1px solid #e4e9f0; border-radius: 14px; padding: 16px; margin: 0 0 11px; box-shadow: 0 2px 8px #1720330a; }}
-    h2 {{ margin: 0; font-size: 1.05rem; line-height: 1.4; font-weight: 650; }}
-    a {{ color: #142c4c; text-decoration: none; }}
-    a:active {{ color: #315d92; }}
-    .meta {{ margin: 11px 0 0; color: #68768b; font-size: .78rem; line-height: 1.5; }}
-    .badge {{ display: inline-block; margin-right: 5px; border-radius: 999px; padding: 2px 7px; color: #175c43; background: #e3f5eb; font-size: .68rem; font-weight: 700; vertical-align: 2px; }}
-    .empty {{ background: white; border-radius: 14px; padding: 22px; color: #627087; }}
-    footer {{ color: #778398; font-size: .75rem; padding: 12px 4px; }}
+    header {{ padding: 18px 4px 14px; }}
+    h1 {{ margin: 0; font-size: clamp(1.8rem, 8vw, 2.5rem); letter-spacing: -.045em; }}
+    header p {{ margin: 8px 0 0; color: #65748b; font-size: .92rem; line-height: 1.5; }}
+    .section-nav {{ position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 16px; padding: 10px 16px; background: #f2f5f9eF; backdrop-filter: blur(12px); scrollbar-width: none; }}
+    .section-nav a {{ flex: 0 0 auto; border: 1px solid #dce3ed; border-radius: 999px; padding: 8px 12px; background: #fff; color: #26374e; font-size: .8rem; font-weight: 650; text-decoration: none; }}
+    .news-section {{ --accent: #315c91; scroll-margin-top: 70px; margin: 0 0 26px; }}
+    .section--europe {{ --accent: #287c89; }}
+    .section--middle-east {{ --accent: #b16a29; }}
+    .section--worth-a-look {{ --accent: #7753a4; }}
+    .section-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left: 4px solid var(--accent); padding: 3px 4px 3px 12px; margin: 0 0 12px; }}
+    .section-heading h2 {{ margin: 0; color: #192b42; font-size: 1.35rem; letter-spacing: -.025em; }}
+    .section-heading p {{ margin: 4px 0 0; color: #6b7890; font-size: .8rem; line-height: 1.4; }}
+    .section-count {{ display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--accent) 12%, white); color: var(--accent); font-size: .78rem; font-weight: 750; }}
+    .story {{ background: white; border: 1px solid #e2e8f0; border-radius: 13px; padding: 15px; margin: 0 0 9px; box-shadow: 0 2px 8px #1720330a; }}
+    .story h3 {{ margin: 0; font-size: 1rem; line-height: 1.45; font-weight: 650; }}
+    .story a {{ color: #182f4e; text-decoration: none; }}
+    .story a:active {{ color: var(--accent); }}
+    .meta {{ margin: 9px 0 0; color: #6c7a8e; font-size: .76rem; line-height: 1.5; }}
+    .badge {{ display: inline-block; margin: 0 6px 4px 0; border-radius: 999px; padding: 3px 8px; color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, white); font-size: .65rem; font-weight: 700; vertical-align: 2px; white-space: nowrap; }}
+    .empty {{ background: white; border: 1px solid #e2e8f0; border-radius: 13px; padding: 16px; color: #6b7890; font-size: .85rem; }}
+    .more {{ margin: 10px 0 0; }}
+    .more summary {{ padding: 10px 4px; color: #345b8b; font-size: .82rem; font-weight: 700; cursor: pointer; }}
+    footer {{ color: #78869a; font-size: .74rem; line-height: 1.5; padding: 10px 4px; }}
   </style>
 </head>
 <body>
   <main>
     <header>
       <h1>Top News</h1>
-      <p>Headlines appearing across the most outlets, with US-related stories prioritized.</p>
+      <p>Regional headlines ranked by how many outlets cover them, plus stories worth a closer look.</p>
     </header>
+    <nav class="section-nav" aria-label="News sections">
+      <a href="#us">US</a>
+      <a href="#europe">Europe</a>
+      <a href="#middle-east">Middle East</a>
+      <a href="#worth-a-look">Worth a look</a>
+    </nav>
     {content}
-    <footer>Updated {html.escape(timestamp)} · Headlines only; stories are grouped by title similarity.</footer>
+    <footer>Updated {html.escape(timestamp)} · Stories are grouped by headline similarity; region labels are inferred from headline keywords.</footer>
   </main>
 </body>
 </html>
@@ -225,6 +343,7 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     feeds = config.get("feeds", [])
     keywords = config.get("us_keywords", [])
+    region_keywords = config.get("region_keywords", {})
     articles: list[Article] = []
     failures = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(12, len(feeds) or 1)) as pool:
@@ -243,7 +362,7 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
         raise RuntimeError("No headlines were fetched; refusing to publish an empty dashboard.")
 
     now = datetime.now(timezone.utc)
-    ranked = rank_stories(cluster_articles(articles), keywords, now)
+    ranked = rank_stories(cluster_articles(articles), keywords, now, region_keywords)
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "index.html").write_text(render_page(ranked, now), encoding="utf-8")
     manifest = {

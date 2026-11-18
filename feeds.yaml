@@ -47,6 +47,139 @@ us_keywords:
   - Miami
   - Detroit
   - Atlanta
+region_keywords:
+  europe:
+    - Europe
+    - European
+    - European Union
+    - EU
+    - United Kingdom
+    - UK
+    - U.K.
+    - Britain
+    - British
+    - England
+    - Scotland
+    - Wales
+    - Ireland
+    - Irish
+    - London
+    - France
+    - French
+    - Paris
+    - Germany
+    - German
+    - Berlin
+    - Italy
+    - Italian
+    - Rome
+    - Spain
+    - Spanish
+    - Madrid
+    - Portugal
+    - Lisbon
+    - Netherlands
+    - Dutch
+    - Amsterdam
+    - Belgium
+    - Brussels
+    - Switzerland
+    - Swiss
+    - Austria
+    - Vienna
+    - Poland
+    - Polish
+    - Warsaw
+    - Ukraine
+    - Ukrainian
+    - Kyiv
+    - Russia
+    - Russian
+    - Moscow
+    - Belarus
+    - Minsk
+    - Estonia
+    - Latvia
+    - Lithuania
+    - Baltic
+    - Scandinavia
+    - Sweden
+    - Stockholm
+    - Norway
+    - Oslo
+    - Denmark
+    - Copenhagen
+    - Finland
+    - Helsinki
+    - Iceland
+    - Greece
+    - Athens
+    - Cyprus
+    - Romania
+    - Bulgaria
+    - Serbia
+    - Kosovo
+    - Croatia
+    - Hungary
+    - Czechia
+    - Prague
+    - Slovakia
+    - Albania
+    - Moldova
+    - Bosnia
+    - Slovenia
+    - Balkans
+  middle_east:
+    - Middle East
+    - Middle Eastern
+    - Mideast
+    - Israel
+    - Israeli
+    - Israelis
+    - Palestine
+    - Palestinian
+    - Palestinians
+    - Gaza
+    - West Bank
+    - Jerusalem
+    - Tel Aviv
+    - Lebanon
+    - Lebanese
+    - Beirut
+    - Hezbollah
+    - Iran
+    - Iranian
+    - Tehran
+    - Iraq
+    - Iraqi
+    - Baghdad
+    - Syria
+    - Syrian
+    - Damascus
+    - Yemen
+    - Yemeni
+    - Houthi
+    - Saudi Arabia
+    - Saudi
+    - Riyadh
+    - Qatar
+    - Qatari
+    - Doha
+    - United Arab Emirates
+    - UAE
+    - Dubai
+    - Abu Dhabi
+    - Kuwait
+    - Bahrain
+    - Oman
+    - Jordan
+    - Amman
+    - Egypt
+    - Cairo
+    - Turkey
+    - Turkish
+    - Ankara
+    - Istanbul
 feeds:
   - name: Washington Post
     url: https://feeds.washingtonpost.com/rss/national
