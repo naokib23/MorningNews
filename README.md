@@ -5,11 +5,11 @@ A personal, headlines-only news dashboard that groups similar stories across out
 ## Set up GitHub Pages
 
 1. **Settings → Pages** should use **GitHub Actions** as the build and deployment source; this repository is already configured that way.
-2. Ensure **Settings → Actions → General → Workflow permissions** permits workflows to write repository contents. The keepalive workflow uses this permission for an empty commit; it does not commit generated site files.
+2. The keepalive job explicitly requests `contents: write` for its empty commit; no personal access token or repo-wide permission change is needed.
 3. The dashboard workflow deploys on a 30-minute schedule and can also be started with **Actions → Update news dashboard → Run workflow**.
 4. Open **Settings → Pages** for the published URL. On an iPhone, open that URL in Safari, tap **Share → Add to Home Screen**, and enable **Open as Web App** if offered.
 
-The schedule can start several minutes after a half-hour boundary because GitHub may delay scheduled jobs during high load. GitHub disables scheduled workflows in repositories with no activity for 60 days. The monthly keepalive workflow creates an empty commit on the default branch so this repository continues to have activity without adding generated HTML commits. Scheduled runs use GitHub-hosted runners and GitHub Pages; no server or secrets are required.
+The schedule can start several minutes after a half-hour boundary because GitHub may delay scheduled jobs during high load. GitHub disables scheduled workflows in repositories with no activity for 60 days. The monthly keepalive workflow creates an empty commit on the default branch so this repository continues to have activity without adding generated HTML commits; it also has a manual dispatch for verification. Scheduled runs use GitHub-hosted runners and GitHub Pages; no server or secrets are required.
 
 The first Pages deployment may require an approval in the `github-pages` environment, depending on repository settings. A green build alone does not mean Pages is configured or that the site is publicly available.
 
