@@ -51,12 +51,15 @@ class DashboardTests(unittest.TestCase):
             self.article('<script>alert("x")</script>', "Outlet", summary='<b>feed summary</b>')
         ])
         page = render_page([(story, "us")], self.now)
-        self.assertNotIn("<script>", page)
+        self.assertNotIn('<script>alert("x")</script>', page)
         self.assertIn("&lt;script&gt;", page)
         self.assertIn("&lt;b&gt;feed summary&lt;/b&gt;", page)
         self.assertIn('<p class="summary">', page)
         self.assertIn("color-scheme: dark", page)
         self.assertIn("#0d1117", page)
+        self.assertIn('id="refresh-dashboard"', page)
+        self.assertIn('url.searchParams.set("refresh", Date.now())', page)
+        self.assertIn("window.location.replace(url.href)", page)
 
     def test_feed_summaries_are_cleaned_and_capped(self):
         self.assertEqual(clean_summary("<p>Short &amp; useful.</p>"), "Short & useful.")

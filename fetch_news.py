@@ -319,8 +319,11 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
     body {{ margin: 0; padding: max(20px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }}
     main {{ max-width: 1200px; margin: 0 auto; }}
     header {{ padding: 18px 4px 14px; }}
+    .header-row {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; }}
     h1 {{ margin: 0; font-size: clamp(1.8rem, 8vw, 2.5rem); letter-spacing: -.045em; }}
     header p {{ margin: 8px 0 0; color: #8b949e; font-size: .92rem; line-height: 1.5; }}
+    .refresh-button {{ flex: 0 0 auto; min-height: 44px; border: 1px solid #30363d; border-radius: 999px; padding: 0 16px; background: #21262d; color: #e6edf3; font: inherit; font-size: .85rem; font-weight: 650; cursor: pointer; }}
+    .refresh-button:hover, .refresh-button:focus-visible {{ border-color: #58a6ff; outline: none; }}
     .section-nav {{ position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 16px; padding: 10px 16px; background: #0d1117ed; backdrop-filter: blur(12px); scrollbar-width: none; }}
     .section-nav a {{ flex: 0 0 auto; border: 1px solid #30363d; border-radius: 999px; padding: 8px 12px; background: #161b22; color: #e6edf3; font-size: .8rem; font-weight: 650; text-decoration: none; }}
     .section-nav a:hover, .section-nav a:focus-visible {{ border-color: #58a6ff; outline: none; }}
@@ -355,7 +358,10 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
 <body>
   <main>
     <header>
-      <h1>Top News</h1>
+      <div class="header-row">
+        <h1>Top News</h1>
+        <button class="refresh-button" id="refresh-dashboard" type="button" aria-label="Refresh dashboard">Refresh</button>
+      </div>
       <p>Regional headlines ranked by outlet coverage, with brief context from each feed.</p>
     </header>
     <nav class="section-nav" aria-label="News sections">
@@ -367,6 +373,13 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
     {content}
     <footer>Updated {html.escape(timestamp)} · Summaries come from RSS/Atom feeds; region labels are inferred from headlines.</footer>
   </main>
+  <script>
+    document.getElementById("refresh-dashboard").addEventListener("click", () => {{
+      const url = new URL(window.location.href);
+      url.searchParams.set("refresh", Date.now());
+      window.location.replace(url.href);
+    }});
+  </script>
 </body>
 </html>
 """
