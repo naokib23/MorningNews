@@ -31,14 +31,7 @@ STOP_WORDS = {
 MAX_ARTICLES_PER_FEED = 25
 MAX_AGE_HOURS = 72
 MAX_SUMMARY_CHARS = 220
-MIN_OUTLETS_FOR_REGIONAL_SECTIONS = 3
 MAX_VISIBLE_PER_SECTION = 10
-REGION_NAMES = {
-    "us": "US",
-    "europe": "Europe",
-    "middle_east": "Middle East",
-    "other": "Other world",
-}
 
 
 @dataclass
@@ -50,6 +43,7 @@ class Article:
     published: datetime
     summary: str = ""
     image_url: str = ""
+    local_news: bool = False
 
     @property
     def tokens(self) -> set[str]:
@@ -62,6 +56,10 @@ class Article:
 @dataclass
 class Story:
     articles: list[Article] = field(default_factory=list)
+
+    @property
+    def local_news(self) -> bool:
+        return self.articles[0].local_news
 
     @property
     def outlets(self) -> set[str]:
@@ -222,6 +220,7 @@ def fetch_feed(feed: dict, timeout: int = 12) -> list[Article]:
             published=published,
             summary=clean_summary(str(entry.get("summary", ""))),
             image_url=extract_image_url(entry, feed["url"]),
+            local_news=bool(feed.get("local_news", False)),
         ))
     return articles
 
@@ -258,6 +257,7 @@ def cluster_articles(articles: list[Article]) -> list[Story]:
         matching = [
             story for story in stories
             if article.outlet not in story.outlets
+            and article.local_news == story.local_news
             and any(similar_titles(article, candidate) for candidate in story.articles)
         ]
         if matching:
@@ -309,18 +309,18 @@ def rank_stories(
     ]
 
 
-def group_sections(ranked_stories: list[tuple[Story, str]]) -> tuple[dict[str, list[Story]], list[tuple[Story, str]]]:
+def group_sections(ranked_stories: list[tuple[Story, str]]) -> tuple[dict[str, list[Story]], list[Story]]:
     sections = {"us": [], "europe": [], "middle_east": []}
-    worth_a_look = []
+    atlanta_stories = []
     for story, region in ranked_stories:
-        if region != "other":
+        if story.local_news:
+            atlanta_stories.append(story)
+        elif region != "other":
             sections[region].append(story)
-        if len(story.outlets) < MIN_OUTLETS_FOR_REGIONAL_SECTIONS or region == "other":
-            worth_a_look.append((story, region))
-    return sections, worth_a_look
+    return sections, atlanta_stories
 
 
-def render_card(story: Story, region: str, small_news: bool = False) -> str:
+def render_card(story: Story) -> str:
     article = story.latest
     title = html.escape(article.title)
     linked_title = f'<a href="{html.escape(article.link, quote=True)}" rel="noopener noreferrer">{title}</a>' if article.link else title
@@ -332,18 +332,11 @@ def render_card(story: Story, region: str, small_news: bool = False) -> str:
     outlets = ", ".join(sorted(story.outlets))
     count = len(story.outlets)
     outlet_label = "outlet" if count == 1 else "outlets"
-    badges = ""
-    if small_news:
-        tags = []
-        if region != "other":
-            tags.append(REGION_NAMES[region])
-        tags.append("Under-covered" if count < MIN_OUTLETS_FOR_REGIONAL_SECTIONS else "Other world")
-        badges = "".join(f'<span class="badge">{html.escape(tag)}</span>' for tag in tags)
     summary = html.escape(article.summary) if article.summary else "No summary provided by this feed."
     return (
         '<article class="story">'
         f'{image}'
-        f'<h3>{badges}{linked_title}</h3>'
+        f'<h3>{linked_title}</h3>'
         f'<p class="summary">{summary}</p>'
         f'<p class="meta">{count} {outlet_label} · {html.escape(outlets)}</p>'
         '</article>'
@@ -354,15 +347,14 @@ def render_section(
     section_id: str,
     title: str,
     description: str,
-    stories: list[tuple[Story, str]],
-    small_news: bool = False,
+    stories: list[Story],
 ) -> str:
     visible = stories[:MAX_VISIBLE_PER_SECTION]
-    cards = "\n".join(render_card(story, region, small_news) for story, region in visible)
+    cards = "\n".join(render_card(story) for story in visible)
     if len(stories) > len(visible):
         more_cards = "\n".join(
-            render_card(story, region, small_news)
-            for story, region in stories[len(visible):]
+            render_card(story)
+            for story in stories[len(visible):]
         )
         cards += (
             '<details class="more">'
@@ -417,20 +409,19 @@ def render_page(
     updated: datetime,
     live_news_url: str = "",
 ) -> str:
-    sections, worth_a_look = group_sections(ranked_stories)
+    sections, atlanta_stories = group_sections(ranked_stories)
     regional_sections = "\n".join([
-        render_section("us", "US", "The most widely covered US stories.", [(story, "us") for story in sections["us"]]),
-        render_section("europe", "Europe", "Major stories from across Europe.", [(story, "europe") for story in sections["europe"]]),
-        render_section("middle-east", "Middle East", "Major stories from across the Middle East.", [(story, "middle_east") for story in sections["middle_east"]]),
+        render_section("us", "US", "The most widely covered US stories.", sections["us"]),
+        render_section("europe", "Europe", "Major stories from across Europe.", sections["europe"]),
+        render_section("middle-east", "Middle East", "Major stories from across the Middle East.", sections["middle_east"]),
     ])
     content = (
         f'<div class="regional-grid">{regional_sections}</div>'
         + render_section(
-            "other-news",
-            "Other News",
-            "Less-covered stories from every region, plus notable world headlines.",
-            worth_a_look,
-            small_news=True,
+            "atlanta",
+            "Atlanta",
+            "Local headlines from Atlanta-area news outlets.",
+            atlanta_stories,
         )
     )
     timestamp = updated.strftime("%b %d, %Y at %H:%M UTC")
@@ -464,7 +455,7 @@ def render_page(
     .news-section {{ --accent: #58a6ff; scroll-margin-top: 70px; margin: 0 0 26px; }}
     .section--europe {{ --accent: #39c5cf; }}
     .section--middle-east {{ --accent: #d29922; }}
-    .section--other-news {{ --accent: #bc8cff; }}
+    .section--atlanta {{ --accent: #bc8cff; }}
     .latest-strip {{ margin: 0 0 20px; border: 1px solid #30363d; border-radius: 12px; background: #161b22; overflow: hidden; }}
     .latest-header {{ display: flex; align-items: center; gap: 10px; padding: 10px 14px 0; }}
     .latest-label {{ flex: 0 0 auto; color: #ff7b72; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }}
@@ -508,13 +499,13 @@ def render_page(
         <h1>Top News</h1>
         <button class="refresh-button" id="refresh-dashboard" type="button" aria-label="Refresh dashboard">Refresh</button>
       </div>
-      <p>Regional headlines ranked by outlet coverage, with brief context from each feed.</p>
+      <p>Regional and Atlanta headlines ranked by outlet coverage, with brief context from each feed.</p>
     </header>
     <nav class="section-nav" aria-label="News sections">
       <a href="#us">US</a>
       <a href="#europe">Europe</a>
       <a href="#middle-east">Middle East</a>
-      <a href="#other-news">Other News</a>
+      <a href="#atlanta">Atlanta</a>
     </nav>
     <section class="latest-strip" aria-label="Latest headlines">
       <div class="latest-header">

@@ -1,4 +1,4 @@
-# 21 validated official RSS/Atom feeds. Outlets without a usable feed are documented in README.md.
+# 25 validated official RSS/Atom feeds. Outlets without a usable feed are documented in README.md.
 us_keywords:
   - United States
   - U.S.
@@ -244,3 +244,19 @@ feeds:
   - name: Middle East Eye
     url: https://www.middleeasteye.net/rss/news
     us_focused: false
+  - name: FOX 5 Atlanta
+    url: https://www.fox5atlanta.com/rss/category/local-news
+    us_focused: true
+    local_news: true
+  - name: WSB-TV
+    url: https://www.wsbtv.com/arc/outboundfeeds/rss/category/news/local/?outputType=xml
+    us_focused: true
+    local_news: true
+  - name: 11Alive
+    url: https://www.11alive.com/feeds/syndication/rss/news/local
+    us_focused: true
+    local_news: true
+  - name: Atlanta News First
+    url: https://www.atlantanewsfirst.com/arc/outboundfeeds/rss/category/news/?outputType=xml
+    us_focused: true
+    local_news: true

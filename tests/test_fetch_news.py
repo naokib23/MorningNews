@@ -24,7 +24,7 @@ class DashboardTests(unittest.TestCase):
     def setUp(self):
         self.now = datetime(2026, 11, 18, 12, 0, tzinfo=timezone.utc)
 
-    def article(self, title, outlet, hours_ago=0, us_focused=False, summary=""):
+    def article(self, title, outlet, hours_ago=0, us_focused=False, summary="", local_news=False):
         from datetime import timedelta
 
         return Article(
@@ -34,6 +34,7 @@ class DashboardTests(unittest.TestCase):
             us_focused=us_focused,
             published=self.now - timedelta(hours=hours_ago),
             summary=summary,
+            local_news=local_news,
         )
 
     def test_clusters_similar_titles_from_distinct_outlets(self):
@@ -153,7 +154,7 @@ class DashboardTests(unittest.TestCase):
         self.assertTrue(is_us_related("Congress debates a new bill", ["Congress"]))
         self.assertFalse(is_us_related("Congressional debates continue", ["Congress"]))
 
-    def test_regions_and_undercovered_stories_are_separated(self):
+    def test_atlanta_stories_are_separated_from_regional_news(self):
         us_story = Story([
             self.article("Senate approves major bill", "A", us_focused=True),
             self.article("Senate approves major bill", "B", us_focused=True),
@@ -165,32 +166,42 @@ class DashboardTests(unittest.TestCase):
             self.article("Ukraine announces new talks", "F"),
         ])
         middle_east_story = Story([self.article("US officials meet Iranian leaders", "G")])
-        other_world_story = Story([
-            self.article("China announces new trade rules", "H"),
-            self.article("China announces new trade rules", "I"),
-            self.article("China announces new trade rules", "J"),
+        atlanta_story = Story([
+            self.article("Atlanta council approves new transit plan", "FOX 5", local_news=True),
+            self.article("Atlanta council approves new transit plan", "WSB-TV", local_news=True),
         ])
+        nonlocal_story = self.article(
+            "Atlanta council approves new transit plan", "National News"
+        )
         ranked = rank_stories(
-            [us_story, europe_story, middle_east_story, other_world_story],
+            [
+                us_story,
+                europe_story,
+                middle_east_story,
+                atlanta_story,
+                Story([nonlocal_story]),
+            ],
             ["Senate", "US"],
             self.now,
             {"europe": ["Ukraine"], "middle_east": ["Iran", "Iranian"]},
         )
-        sections, worth_a_look = group_sections(ranked)
+        sections, atlanta_stories = group_sections(ranked)
         self.assertEqual(len(sections["us"]), 1)
         self.assertEqual(len(sections["europe"]), 1)
         self.assertEqual(len(sections["middle_east"]), 1)
         self.assertIn(middle_east_story, sections["middle_east"])
-        self.assertEqual(len(worth_a_look), 2)
-        self.assertIn("Middle East", render_page(ranked, self.now))
+        self.assertEqual(atlanta_stories, [atlanta_story])
+        clusters = cluster_articles(atlanta_story.articles + [nonlocal_story])
+        self.assertEqual(len(clusters), 2)
         page = render_page(ranked, self.now)
-        self.assertIn("Other News", page)
+        self.assertIn("Atlanta", page)
+        self.assertNotIn("Other News", page)
         self.assertIn('class="regional-grid"', page)
         self.assertIn("grid-template-columns: repeat(3", page)
         self.assertIn("grid-auto-flow: column", page)
         self.assertLess(page.index('id="us"'), page.index('id="europe"'))
         self.assertLess(page.index('id="europe"'), page.index('id="middle-east"'))
-        self.assertLess(page.index('id="middle-east"'), page.index('id="other-news"'))
+        self.assertLess(page.index('id="middle-east"'), page.index('id="atlanta"'))
 
 
 if __name__ == "__main__":
