@@ -535,7 +535,7 @@ def render_page(
         <h1>Top News</h1>
         <button class="refresh-button" id="refresh-dashboard" type="button" aria-label="Refresh dashboard">Refresh</button>
       </div>
-      <p>A quick briefing from across the U.S. and around Atlanta.</p>
+      <p>Top stories from the U.S., Europe, the Middle East, and Atlanta.</p>
       {source_disclosure}
     </header>
     <nav class="section-nav" aria-label="News sections">

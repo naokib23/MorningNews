@@ -93,7 +93,7 @@ class DashboardTests(unittest.TestCase):
             self.now,
             source_names=["Washington Post", "The Guardian"],
         )
-        self.assertIn("A quick briefing from across the U.S. and around Atlanta.", page)
+        self.assertIn("Top stories from the U.S., Europe, the Middle East, and Atlanta.", page)
         self.assertIn("Sources (2)", page)
         self.assertIn("<li>Washington Post</li>", page)
         self.assertIn("<li>The Guardian</li>", page)
