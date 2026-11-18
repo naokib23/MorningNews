@@ -1,0 +1,113 @@
+# 21 validated official RSS/Atom feeds. Outlets without a usable feed are documented in README.md.
+us_keywords:
+  - United States
+  - U.S.
+  - US
+  - USA
+  - America
+  - American
+  - White House
+  - Congress
+  - Senate
+  - House of Representatives
+  - Supreme Court
+  - Pentagon
+  - State Department
+  - Washington
+  - federal government
+  - federal
+  - Donald Trump
+  - Joe Biden
+  - presidential election
+  - New York
+  - California
+  - Texas
+  - Florida
+  - Alaska
+  - Arizona
+  - Colorado
+  - Georgia
+  - Hawaii
+  - Illinois
+  - Massachusetts
+  - Michigan
+  - Minnesota
+  - Nevada
+  - Ohio
+  - Pennsylvania
+  - Virginia
+  - Seattle
+  - Chicago
+  - Los Angeles
+  - San Francisco
+  - Philadelphia
+  - Pittsburgh
+  - Boston
+  - Houston
+  - Miami
+  - Detroit
+  - Atlanta
+feeds:
+  - name: Washington Post
+    url: https://feeds.washingtonpost.com/rss/national
+    us_focused: true
+  - name: Wall Street Journal
+    url: https://feeds.a.dj.com/rss/RSSWorldNews.xml
+    us_focused: true
+  - name: New York Times
+    url: https://rss.nytimes.com/services/xml/rss/nyt/US.xml
+    us_focused: true
+  - name: Los Angeles Times
+    url: https://www.latimes.com/local/rss2.0.xml
+    us_focused: true
+  - name: Fox News
+    url: https://moxie.foxnews.com/google-publisher/latest.xml
+    us_focused: true
+  - name: MS NOW
+    url: https://feeds.nbcnews.com/nbcnews/public/news
+    us_focused: true
+  - name: The Hill
+    url: https://thehill.com/feed/
+    us_focused: true
+  - name: New York Post
+    url: https://nypost.com/feed/
+    us_focused: true
+  - name: Real Clear Politics
+    url: https://www.realclearpolitics.com/index.xml
+    us_focused: true
+  - name: Axios
+    url: https://api.axios.com/feed/
+    us_focused: true
+  - name: The Guardian
+    url: https://www.theguardian.com/world/rss
+    us_focused: false
+  - name: The Telegraph
+    url: https://www.telegraph.co.uk/rss.xml
+    us_focused: false
+  - name: London Evening Standard
+    url: https://www.standard.co.uk/rss
+    us_focused: false
+  - name: BBC
+    url: https://feeds.bbci.co.uk/news/rss.xml
+    us_focused: false
+  - name: Drop Site News
+    url: https://www.dropsitenews.com/feed
+    us_focused: false
+  - name: Al Jazeera
+    url: https://www.aljazeera.com/xml/rss/all.xml
+    us_focused: false
+  - name: Al-Monitor
+    url: https://www.al-monitor.com/rss
+    us_focused: false
+  - name: The Electronic Intifada
+    url: https://electronicintifada.net/rss.xml
+    us_focused: false
+  - name: Consortium News
+    url: https://consortiumnews.com/feed/
+    us_focused: false
+  - name: Covert Action Magazine
+    url: https://covertactionmagazine.com/feed/
+    us_focused: false
+  - name: Middle East Eye
+    url: https://www.middleeasteye.net/rss/news
+    us_focused: false
