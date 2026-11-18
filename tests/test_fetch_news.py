@@ -87,6 +87,18 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("anchor.href = link.href", page)
         self.assertNotIn("storyPageByLink", page)
 
+    def test_header_lists_configured_sources_with_brief_copy(self):
+        page = render_page(
+            [],
+            self.now,
+            source_names=["Washington Post", "The Guardian"],
+        )
+        self.assertIn("A quick briefing from across the U.S. and around Atlanta.", page)
+        self.assertIn("Sources (2)", page)
+        self.assertIn("<li>Washington Post</li>", page)
+        self.assertIn("<li>The Guardian</li>", page)
+        self.assertNotIn("ranked by outlet coverage", page)
+
     def test_story_card_links_headline_and_each_source_to_publisher(self):
         lead = self.article("Matched headline", "Outlet A", summary="Brief RSS context")
         lead.link = "https://outlet-a.example/story"
@@ -120,7 +132,9 @@ class DashboardTests(unittest.TestCase):
                 "name": "Example News",
                 "url": "https://example.com/feed.xml",
             }])
-            self.assertTrue((output / "index.html").exists())
+            page = (output / "index.html").read_text(encoding="utf-8")
+            self.assertIn("Sources (1)", page)
+            self.assertIn("<li>Example News</li>", page)
             self.assertFalse((output / "articles").exists())
 
     def test_feed_summaries_are_cleaned_and_capped(self):

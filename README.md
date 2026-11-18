@@ -33,7 +33,7 @@ The app compares normalized headline words to group likely matches and ranks by 
 
 Article cards show an image when the RSS/Atom entry includes media metadata, an image enclosure, or an embedded image in its feed content. Images are loaded directly from the publisher with lazy loading; the dashboard does not scrape article pages, and some feeds do not provide images.
 
-Story headlines link directly to the publisher article. Each card ends with clickable source links for the outlets that covered the story, so readers can choose which publisher to open without an intermediate page.
+The header includes a compact, expandable list of configured outlets. Story headlines link directly to the publisher article, and each card ends with clickable source links for the outlets that covered the story.
 
 The Atlanta section uses verified local RSS feeds from FOX 5 Atlanta, WSB-TV, 11Alive, and Atlanta News First. The requested Atlanta Voice page and its feed endpoints returned HTTP 403 during validation, so it is omitted rather than scraped; it can be added if a public official RSS/Atom feed becomes available.
 

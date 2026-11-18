@@ -422,8 +422,23 @@ def render_page(
     ranked_stories: list[tuple[Story, str]],
     updated: datetime,
     live_news_url: str = "",
+    source_names: list[str] | None = None,
 ) -> str:
     sections, atlanta_stories = group_sections(ranked_stories)
+    if source_names is None:
+        source_names = sorted({
+            article.outlet
+            for story, _ in ranked_stories
+            for article in story.articles
+        }, key=str.casefold)
+    source_names = list(dict.fromkeys(source_names))
+    source_list = "\n".join(
+        f"<li>{html.escape(name)}</li>" for name in source_names
+    )
+    source_disclosure = (
+        f'<details class="feed-sources"><summary>Sources ({len(source_names)})</summary>'
+        f'<ul>{source_list}</ul></details>'
+    )
     regional_sections = "\n".join([
         render_section("us", "US", "The most widely covered US stories.", sections["us"]),
         render_section("europe", "Europe", "Major stories from across Europe.", sections["europe"]),
@@ -461,6 +476,10 @@ def render_page(
     .header-row {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; }}
     h1 {{ margin: 0; font-size: clamp(1.8rem, 8vw, 2.5rem); letter-spacing: -.045em; }}
     header p {{ margin: 8px 0 0; color: #8b949e; font-size: .92rem; line-height: 1.5; }}
+    .feed-sources {{ margin-top: 10px; }}
+    .feed-sources summary {{ width: fit-content; color: #58a6ff; font-size: .78rem; font-weight: 650; cursor: pointer; }}
+    .feed-sources ul {{ display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }}
+    .feed-sources li {{ border: 1px solid #30363d; border-radius: 999px; padding: 4px 8px; background: #161b22; color: #c9d1d9; font-size: .72rem; }}
     .refresh-button {{ flex: 0 0 auto; min-height: 44px; border: 1px solid #30363d; border-radius: 999px; padding: 0 16px; background: #21262d; color: #e6edf3; font: inherit; font-size: .85rem; font-weight: 650; cursor: pointer; }}
     .refresh-button:hover, .refresh-button:focus-visible {{ border-color: #58a6ff; outline: none; }}
     .section-nav {{ position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 16px; padding: 10px 16px; background: #0d1117ed; backdrop-filter: blur(12px); scrollbar-width: none; }}
@@ -516,7 +535,8 @@ def render_page(
         <h1>Top News</h1>
         <button class="refresh-button" id="refresh-dashboard" type="button" aria-label="Refresh dashboard">Refresh</button>
       </div>
-      <p>Regional and Atlanta headlines ranked by outlet coverage, with brief context from each feed.</p>
+      <p>A quick briefing from across the U.S. and around Atlanta.</p>
+      {source_disclosure}
     </header>
     <nav class="section-nav" aria-label="News sections">
       <a href="#us">US</a>
@@ -639,7 +659,8 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
     if live_news_url and urlsplit(live_news_url).scheme != "https":
         raise ValueError("LIVE_NEWS_URL must use HTTPS.")
     (output_dir / "index.html").write_text(
-        render_page(ranked, now, live_news_url), encoding="utf-8"
+        render_page(ranked, now, live_news_url, [feed["name"] for feed in feeds]),
+        encoding="utf-8",
     )
     (output_dir / "feeds.json").write_text(
         json.dumps(
