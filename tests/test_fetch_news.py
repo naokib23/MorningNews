@@ -141,9 +141,12 @@ class DashboardTests(unittest.TestCase):
         story = Story([self.article(
             "Story with an image",
             "Outlet",
+            local_news=True,
         )])
         story.latest.image_url = "https://images.example.com/story.jpg?size=large&crop=1"
         page = render_page([(story, "us")], self.now)
+        self.assertIn('<article class="story story--with-image">', page)
+        self.assertIn(".section--atlanta .story--with-image", page)
         self.assertIn(
             '<img class="story-image" src="https://images.example.com/story.jpg?size=large&amp;crop=1" '
             'alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">',

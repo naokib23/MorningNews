@@ -333,12 +333,18 @@ def render_card(story: Story) -> str:
     count = len(story.outlets)
     outlet_label = "outlet" if count == 1 else "outlets"
     summary = html.escape(article.summary) if article.summary else "No summary provided by this feed."
-    return (
-        '<article class="story">'
-        f'{image}'
+    story_content = (
         f'<h3>{linked_title}</h3>'
         f'<p class="summary">{summary}</p>'
         f'<p class="meta">{count} {outlet_label} · {html.escape(outlets)}</p>'
+    )
+    story_class = "story story--with-image" if image else "story"
+    if image:
+        story_content = f'<div class="story-content">{story_content}</div>'
+    return (
+        f'<article class="{story_class}">'
+        f'{image}'
+        f'{story_content}'
         '</article>'
     )
 
@@ -456,6 +462,9 @@ def render_page(
     .section--europe {{ --accent: #39c5cf; }}
     .section--middle-east {{ --accent: #d29922; }}
     .section--atlanta {{ --accent: #bc8cff; }}
+    .section--atlanta .story--with-image {{ display: grid; grid-template-columns: clamp(100px, 22%, 180px) minmax(0, 1fr); align-items: start; gap: 0 14px; }}
+    .section--atlanta .story--with-image .story-image {{ grid-column: 1; width: 100%; height: clamp(90px, 9vw, 126px); aspect-ratio: auto; margin: 0; }}
+    .section--atlanta .story-content {{ grid-column: 2; min-width: 0; }}
     .latest-strip {{ margin: 0 0 20px; border: 1px solid #30363d; border-radius: 12px; background: #161b22; overflow: hidden; }}
     .latest-header {{ display: flex; align-items: center; gap: 10px; padding: 10px 14px 0; }}
     .latest-label {{ flex: 0 0 auto; color: #ff7b72; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }}
