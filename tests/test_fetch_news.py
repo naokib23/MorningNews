@@ -76,12 +76,13 @@ class DashboardTests(unittest.TestCase):
             [us_story, europe_story, middle_east_story, other_world_story],
             ["Senate", "US"],
             self.now,
-            {"europe": ["Ukraine"], "middle_east": ["Iran"]},
+            {"europe": ["Ukraine"], "middle_east": ["Iran", "Iranian"]},
         )
         sections, worth_a_look = group_sections(ranked)
         self.assertEqual(len(sections["us"]), 1)
         self.assertEqual(len(sections["europe"]), 1)
-        self.assertEqual(len(sections["middle_east"]), 0)
+        self.assertEqual(len(sections["middle_east"]), 1)
+        self.assertIn(middle_east_story, sections["middle_east"])
         self.assertEqual(len(worth_a_look), 2)
         self.assertIn("Middle East", render_page(ranked, self.now))
         self.assertIn("Worth a look", render_page(ranked, self.now))

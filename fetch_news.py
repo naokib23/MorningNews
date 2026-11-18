@@ -196,10 +196,10 @@ def group_sections(ranked_stories: list[tuple[Story, str]]) -> tuple[dict[str, l
     sections = {"us": [], "europe": [], "middle_east": []}
     worth_a_look = []
     for story, region in ranked_stories:
+        if region != "other":
+            sections[region].append(story)
         if len(story.outlets) < MIN_OUTLETS_FOR_REGIONAL_SECTIONS or region == "other":
             worth_a_look.append((story, region))
-        else:
-            sections[region].append(story)
     return sections, worth_a_look
 
 
@@ -270,7 +270,7 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
         render_section(
             "worth-a-look",
             "Worth a look",
-            "Stories covered by fewer outlets, plus notable headlines outside these regions.",
+            "Less-covered stories from every region, plus notable world headlines.",
             worth_a_look,
             small_news=True,
         ),

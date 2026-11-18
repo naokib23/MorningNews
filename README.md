@@ -17,7 +17,7 @@ The first Pages deployment may require an approval in the `github-pages` environ
 
 `feeds.yaml` holds the official RSS/Atom feed URLs, outlet names, and a flag for US-focused outlets. Each feed is fetched concurrently with a 12-second request timeout. One failed source does not stop the update; if all sources fail to provide recent headlines, the job fails instead of deploying a blank dashboard.
 
-The app compares normalized headline words to group likely matches and ranks by distinct outlet count, with a modest US-related and recency boost. Region-matched stories covered by at least three outlets appear in their regional section; less-covered stories and other-world headlines appear in “Worth a look.” Region keywords in `feeds.yaml` are editable, and European or Middle Eastern matches take precedence over incidental US mentions. Only headline text, outlet names, and publication links appear on the page.
+The app compares normalized headline words to group likely matches and ranks by distinct outlet count, with a modest US-related and recency boost. Region-matched stories appear in their regional section; stories covered by fewer than three outlets are also highlighted in “Worth a look,” along with other-world headlines. Region keywords in `feeds.yaml` are editable, and European or Middle Eastern matches take precedence over incidental US mentions. Only headline text, outlet names, and publication links appear on the page.
 
 The provided outlet list contained 27 outlets. Twenty-one had official RSS/Atom endpoints returning feed XML when checked for this setup. These six were omitted because a usable official feed could not be validated:
 
