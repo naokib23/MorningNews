@@ -31,6 +31,8 @@ The first Pages deployment may require an approval in the `github-pages` environ
 
 The app compares normalized headline words to group likely matches and ranks by distinct outlet count, with a modest US-related and recency boost. Region-matched stories appear in their regional column; stories covered by fewer than three outlets are also highlighted in Other News, along with other-world headlines. Region keywords in `feeds.yaml` are editable, and European or Middle Eastern matches take precedence over incidental US mentions. Summaries use only the RSS/Atom description field, are capped at 220 characters, and are omitted from article content pages; some feeds do not provide a description for every item.
 
+Article cards show an image when the RSS/Atom entry includes media metadata, an image enclosure, or an embedded image in its feed content. Images are loaded directly from the publisher with lazy loading; the dashboard does not scrape article pages, and some feeds do not provide images.
+
 The provided outlet list contained 27 outlets. Twenty-one had official RSS/Atom endpoints returning feed XML when checked for this setup. These six were omitted because a usable official feed could not be validated:
 
 | Outlet | Finding |

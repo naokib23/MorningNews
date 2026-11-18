@@ -12,6 +12,7 @@ from fetch_news import (
     build_dashboard,
     cluster_articles,
     clean_summary,
+    extract_image_url,
     group_sections,
     is_us_related,
     rank_stories,
@@ -63,6 +64,7 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('<p class="summary">', page)
         self.assertIn("color-scheme: dark", page)
         self.assertIn("#0d1117", page)
+        self.assertNotIn('class="story-image"', page)
         self.assertIn('id="refresh-dashboard"', page)
         self.assertIn('url.searchParams.set("refresh", Date.now())', page)
         self.assertIn("window.location.replace(url.href)", page)
@@ -109,6 +111,43 @@ class DashboardTests(unittest.TestCase):
         clipped = clean_summary("A useful feed summary. " * 10, limit=40)
         self.assertLessEqual(len(clipped), 40)
         self.assertTrue(clipped.endswith("…"))
+
+    def test_feed_images_use_rss_metadata_or_embedded_images(self):
+        feed_url = "https://example.com/feed.xml"
+        self.assertEqual(
+            extract_image_url(
+                {"media_content": [{"url": "https://images.example.com/story.jpg", "medium": "image"}]},
+                feed_url,
+            ),
+            "https://images.example.com/story.jpg",
+        )
+        self.assertEqual(
+            extract_image_url(
+                {"summary": '<p>Story</p><img src="/images/story.webp">'},
+                feed_url,
+            ),
+            "https://example.com/images/story.webp",
+        )
+        self.assertEqual(
+            extract_image_url(
+                {"media_thumbnail": [{"url": "http://images.example.com/story.jpg"}]},
+                feed_url,
+            ),
+            "",
+        )
+
+    def test_rendered_article_images_are_lazy_and_escaped(self):
+        story = Story([self.article(
+            "Story with an image",
+            "Outlet",
+        )])
+        story.latest.image_url = "https://images.example.com/story.jpg?size=large&crop=1"
+        page = render_page([(story, "us")], self.now)
+        self.assertIn(
+            '<img class="story-image" src="https://images.example.com/story.jpg?size=large&amp;crop=1" '
+            'alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">',
+            page,
+        )
 
     def test_us_keywords_use_word_boundaries(self):
         self.assertTrue(is_us_related("Congress debates a new bill", ["Congress"]))

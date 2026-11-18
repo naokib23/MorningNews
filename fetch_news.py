@@ -16,8 +16,9 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
+from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import feedparser
 
@@ -48,6 +49,7 @@ class Article:
     us_focused: bool
     published: datetime
     summary: str = ""
+    image_url: str = ""
 
     @property
     def tokens(self) -> set[str]:
@@ -103,6 +105,98 @@ def clean_summary(value: str, limit: int = MAX_SUMMARY_CHARS) -> str:
     return text[:end].rstrip(" ,;:-") + "…"
 
 
+class _FeedImageParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.sources: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() != "img":
+            return
+        attributes = dict(attrs)
+        for name in ("src", "data-src", "data-original"):
+            source = attributes.get(name)
+            if source:
+                self.sources.append(source)
+
+
+def safe_image_url(value: str, base_url: str = "") -> str:
+    try:
+        candidate = urljoin(base_url, html.unescape(value).strip())
+        parts = urlsplit(candidate)
+        if parts.scheme == "https" and parts.hostname and not parts.username and not parts.password:
+            return candidate
+    except ValueError:
+        pass
+    return ""
+
+
+def extract_image_url(entry: dict, feed_url: str) -> str:
+    image_suffixes = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif")
+
+    def is_image(item: dict, trusted_image_field: bool = False) -> str:
+        source = str(item.get("url") or item.get("href") or "")
+        candidate = safe_image_url(source, feed_url)
+        if not candidate:
+            return ""
+        mime_type = str(item.get("type", "")).lower().split(";", 1)[0]
+        medium = str(item.get("medium", "")).lower()
+        path = urlsplit(candidate).path.lower()
+        if trusted_image_field or medium == "image" or mime_type in {
+            "image/jpeg", "image/png", "image/gif", "image/webp", "image/avif",
+        } or path.endswith(image_suffixes):
+            return candidate
+        return ""
+
+    for field_name, trusted_image_field in (
+        ("media_thumbnail", True),
+        ("media_content", False),
+        ("itunes_image", True),
+        ("image", True),
+    ):
+        values = entry.get(field_name, [])
+        if isinstance(values, dict):
+            values = [values]
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if isinstance(value, dict):
+                image_url = is_image(value, trusted_image_field)
+                if image_url:
+                    return image_url
+
+    for field_name in ("enclosures", "links"):
+        values = entry.get(field_name, [])
+        if isinstance(values, dict):
+            values = [values]
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if not isinstance(value, dict):
+                continue
+            if field_name == "links" and value.get("rel") != "enclosure":
+                continue
+            image_url = is_image(value)
+            if image_url:
+                return image_url
+
+    content_values = [str(entry.get("summary", ""))]
+    content_values.extend(
+        str(content.get("value", ""))
+        for content in entry.get("content", [])
+        if isinstance(content, dict)
+    )
+    for content in content_values:
+        parser = _FeedImageParser()
+        parser.feed(content)
+        parser.close()
+        for source in parser.sources:
+            image_url = safe_image_url(source, feed_url)
+            if image_url:
+                return image_url
+    return ""
+
+
 def fetch_feed(feed: dict, timeout: int = 12) -> list[Article]:
     request = urllib.request.Request(
         feed["url"],
@@ -127,6 +221,7 @@ def fetch_feed(feed: dict, timeout: int = 12) -> list[Article]:
             us_focused=bool(feed.get("us_focused", False)),
             published=published,
             summary=clean_summary(str(entry.get("summary", ""))),
+            image_url=extract_image_url(entry, feed["url"]),
         ))
     return articles
 
@@ -229,6 +324,11 @@ def render_card(story: Story, region: str, small_news: bool = False) -> str:
     article = story.latest
     title = html.escape(article.title)
     linked_title = f'<a href="{html.escape(article.link, quote=True)}" rel="noopener noreferrer">{title}</a>' if article.link else title
+    image = (
+        f'<img class="story-image" src="{html.escape(article.image_url, quote=True)}" alt="" '
+        'loading="lazy" decoding="async" referrerpolicy="no-referrer">'
+        if safe_image_url(article.image_url) else ""
+    )
     outlets = ", ".join(sorted(story.outlets))
     count = len(story.outlets)
     outlet_label = "outlet" if count == 1 else "outlets"
@@ -242,6 +342,7 @@ def render_card(story: Story, region: str, small_news: bool = False) -> str:
     summary = html.escape(article.summary) if article.summary else "No summary provided by this feed."
     return (
         '<article class="story">'
+        f'{image}'
         f'<h3>{badges}{linked_title}</h3>'
         f'<p class="summary">{summary}</p>'
         f'<p class="meta">{count} {outlet_label} · {html.escape(outlets)}</p>'
@@ -382,6 +483,7 @@ def render_page(
     .section-heading p {{ margin: 4px 0 0; color: #8b949e; font-size: .8rem; line-height: 1.4; }}
     .section-count {{ display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 50%; background: #21262d; color: var(--accent); font-size: .78rem; font-weight: 750; }}
     .story {{ background: #161b22; border: 1px solid #30363d; border-radius: 13px; padding: 15px; margin: 0 0 9px; box-shadow: 0 2px 8px #0104095c; }}
+    .story-image {{ display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; margin: 0 0 12px; border-radius: 8px; background: #0d1117; }}
     .story h3 {{ margin: 0; font-size: 1rem; line-height: 1.45; font-weight: 650; }}
     .story a {{ color: #e6edf3; text-decoration: none; }}
     .story a:active {{ color: var(--accent); }}
