@@ -98,7 +98,14 @@ class DashboardTests(unittest.TestCase):
         self.assertIn(middle_east_story, sections["middle_east"])
         self.assertEqual(len(worth_a_look), 2)
         self.assertIn("Middle East", render_page(ranked, self.now))
-        self.assertIn("Worth a look", render_page(ranked, self.now))
+        page = render_page(ranked, self.now)
+        self.assertIn("Other News", page)
+        self.assertIn('class="regional-grid"', page)
+        self.assertIn("grid-template-columns: repeat(3", page)
+        self.assertIn("grid-auto-flow: column", page)
+        self.assertLess(page.index('id="us"'), page.index('id="europe"'))
+        self.assertLess(page.index('id="europe"'), page.index('id="middle-east"'))
+        self.assertLess(page.index('id="middle-east"'), page.index('id="other-news"'))
 
 
 if __name__ == "__main__":

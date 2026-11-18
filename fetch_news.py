@@ -286,18 +286,21 @@ def render_section(
 
 def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> str:
     sections, worth_a_look = group_sections(ranked_stories)
-    content = "\n".join([
+    regional_sections = "\n".join([
         render_section("us", "US", "The most widely covered US stories.", [(story, "us") for story in sections["us"]]),
         render_section("europe", "Europe", "Major stories from across Europe.", [(story, "europe") for story in sections["europe"]]),
         render_section("middle-east", "Middle East", "Major stories from across the Middle East.", [(story, "middle_east") for story in sections["middle_east"]]),
-        render_section(
-            "worth-a-look",
-            "Worth a look",
+    ])
+    content = (
+        f'<div class="regional-grid">{regional_sections}</div>'
+        + render_section(
+            "other-news",
+            "Other News",
             "Less-covered stories from every region, plus notable world headlines.",
             worth_a_look,
             small_news=True,
-        ),
-    ])
+        )
+    )
     timestamp = updated.strftime("%b %d, %Y at %H:%M UTC")
     return f"""<!doctype html>
 <html lang="en">
@@ -314,7 +317,7 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
     :root {{ color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #e6edf3; scroll-behavior: smooth; }}
     * {{ box-sizing: border-box; }}
     body {{ margin: 0; padding: max(20px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }}
-    main {{ max-width: 760px; margin: 0 auto; }}
+    main {{ max-width: 1200px; margin: 0 auto; }}
     header {{ padding: 18px 4px 14px; }}
     h1 {{ margin: 0; font-size: clamp(1.8rem, 8vw, 2.5rem); letter-spacing: -.045em; }}
     header p {{ margin: 8px 0 0; color: #8b949e; font-size: .92rem; line-height: 1.5; }}
@@ -324,7 +327,9 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
     .news-section {{ --accent: #58a6ff; scroll-margin-top: 70px; margin: 0 0 26px; }}
     .section--europe {{ --accent: #39c5cf; }}
     .section--middle-east {{ --accent: #d29922; }}
-    .section--worth-a-look {{ --accent: #bc8cff; }}
+    .section--other-news {{ --accent: #bc8cff; }}
+    .regional-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 16px; }}
+    .regional-grid .news-section {{ min-width: 0; }}
     .section-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left: 4px solid var(--accent); padding: 3px 4px 3px 12px; margin: 0 0 12px; }}
     .section-heading h2 {{ margin: 0; color: #e6edf3; font-size: 1.35rem; letter-spacing: -.025em; }}
     .section-heading p {{ margin: 4px 0 0; color: #8b949e; font-size: .8rem; line-height: 1.4; }}
@@ -340,6 +345,11 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
     .more {{ margin: 10px 0 0; }}
     .more summary {{ padding: 10px 4px; color: #58a6ff; font-size: .82rem; font-weight: 700; cursor: pointer; }}
     footer {{ color: #8b949e; font-size: .74rem; line-height: 1.5; padding: 10px 4px; }}
+    @media (max-width: 700px) {{
+      main {{ max-width: 760px; }}
+      .regional-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(84vw, 1fr); grid-template-columns: none; overflow-x: auto; margin: 0 -16px 22px; padding: 0 16px 10px; scroll-snap-type: x mandatory; scrollbar-color: #30363d transparent; }}
+      .regional-grid .news-section {{ scroll-snap-align: start; }}
+    }}
   </style>
 </head>
 <body>
@@ -352,7 +362,7 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
       <a href="#us">US</a>
       <a href="#europe">Europe</a>
       <a href="#middle-east">Middle East</a>
-      <a href="#worth-a-look">Worth a look</a>
+      <a href="#other-news">Other News</a>
     </nav>
     {content}
     <footer>Updated {html.escape(timestamp)} · Summaries come from RSS/Atom feeds; region labels are inferred from headlines.</footer>
