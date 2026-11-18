@@ -29,11 +29,11 @@ The first Pages deployment may require an approval in the `github-pages` environ
 
 `feeds.yaml` holds official RSS/Atom feed URLs, outlet names, US-focus flags, and a marker for Atlanta local feeds. Each feed is fetched concurrently with a 12-second request timeout. One failed source does not stop the update; if all sources fail to provide recent headlines, the job fails instead of deploying a blank dashboard.
 
-The app compares normalized headline words to group likely matches and ranks by distinct outlet count, with a modest US-related and recency boost. Non-local region-matched stories appear in their regional column. Atlanta local stories are grouped only with other Atlanta feeds and shown in their own section. Region keywords in `feeds.yaml` are editable, and European or Middle Eastern matches take precedence over incidental US mentions. Summaries use only the RSS/Atom description field, are capped at 220 characters, and are omitted from article content pages; some feeds do not provide a description for every item.
+The app compares normalized headline words to group likely matches and ranks by distinct outlet count, with a modest US-related and recency boost. Non-local region-matched stories appear in their regional column. Atlanta local stories are grouped only with other Atlanta feeds and shown in their own section. Region keywords in `feeds.yaml` are editable, and European or Middle Eastern matches take precedence over incidental US mentions. Summaries use only the RSS/Atom description field and are capped at 220 characters; some feeds do not provide a description for every item.
 
 Article cards show an image when the RSS/Atom entry includes media metadata, an image enclosure, or an embedded image in its feed content. Images are loaded directly from the publisher with lazy loading; the dashboard does not scrape article pages, and some feeds do not provide images.
 
-Opening a story card or ticker headline opens a generated GitHub Pages story view in a new tab. It contains the available RSS/Atom summary and citations linking to each outlet that covered the story; full article text remains on the publisher’s site.
+Story headlines link directly to the publisher article. Each card ends with clickable source links for the outlets that covered the story, so readers can choose which publisher to open without an intermediate page.
 
 The Atlanta section uses verified local RSS feeds from FOX 5 Atlanta, WSB-TV, 11Alive, and Atlanta News First. The requested Atlanta Voice page and its feed endpoints returned HTTP 403 during validation, so it is omitted rather than scraped; it can be added if a public official RSS/Atom feed becomes available.
 
