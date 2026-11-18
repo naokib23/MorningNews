@@ -17,6 +17,8 @@ from fetch_news import (
     is_us_related,
     rank_stories,
     render_page,
+    render_story_page,
+    story_page_path,
 )
 
 
@@ -62,6 +64,10 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn('<script>alert("x")</script>', page)
         self.assertIn("&lt;script&gt;", page)
         self.assertIn("&lt;b&gt;feed summary&lt;/b&gt;", page)
+        story_page = render_story_page(story)
+        self.assertNotIn('<script>alert("x")</script>', story_page)
+        self.assertIn("&lt;script&gt;", story_page)
+        self.assertIn("&lt;b&gt;feed summary&lt;/b&gt;", story_page)
         self.assertIn('<p class="summary">', page)
         self.assertIn("color-scheme: dark", page)
         self.assertIn("#0d1117", page)
@@ -82,6 +88,8 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("A developing story", page)
         self.assertIn("window.setInterval(refreshLatestHeadlines, 60_000)", page)
         self.assertIn("Live feed unavailable · showing scheduled headlines", page)
+        self.assertIn(f'href="{story_page_path(story)}" target="_blank"', page)
+        self.assertIn("storyPageByLink[item.link]", page)
 
     def test_build_publishes_feed_configuration_for_live_worker(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -106,6 +114,24 @@ class DashboardTests(unittest.TestCase):
                 "url": "https://example.com/feed.xml",
             }])
             self.assertTrue((output / "index.html").exists())
+            story_pages = list((output / "articles").glob("*.html"))
+            self.assertEqual(len(story_pages), 1)
+            self.assertIn("Latest headline", story_pages[0].read_text(encoding="utf-8"))
+
+    def test_story_page_shows_rss_summary_and_cites_each_source(self):
+        lead = self.article("Matched headline", "Outlet A", summary="Brief RSS context")
+        lead.link = "https://outlet-a.example/story"
+        second = self.article("Matched headline", "Outlet B")
+        second.link = "https://outlet-b.example/story"
+        story = Story([lead, second])
+        page = render_story_page(story)
+        self.assertIn("Brief RSS context", page)
+        self.assertIn("Outlet A", page)
+        self.assertIn("Outlet B", page)
+        self.assertIn('href="https://outlet-a.example/story"', page)
+        self.assertIn('href="https://outlet-b.example/story"', page)
+        self.assertIn("not a copy of the full publisher article", page)
+        self.assertIn('href="../index.html"', page)
 
     def test_feed_summaries_are_cleaned_and_capped(self):
         self.assertEqual(clean_summary("<p>Short &amp; useful.</p>"), "Short & useful.")

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import calendar
 import concurrent.futures
+import hashlib
 import html
 import json
 import os
@@ -320,10 +321,20 @@ def group_sections(ranked_stories: list[tuple[Story, str]]) -> tuple[dict[str, l
     return sections, atlanta_stories
 
 
+def story_page_path(story: Story) -> str:
+    source_links = sorted(article.link for article in story.articles if article.link)
+    identity = "\n".join(source_links) or story.latest.title
+    story_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+    return f"articles/{story_id}.html"
+
+
 def render_card(story: Story) -> str:
     article = story.latest
     title = html.escape(article.title)
-    linked_title = f'<a href="{html.escape(article.link, quote=True)}" rel="noopener noreferrer">{title}</a>' if article.link else title
+    linked_title = (
+        f'<a href="{html.escape(story_page_path(story), quote=True)}" '
+        f'target="_blank" rel="noopener noreferrer">{title}</a>'
+    )
     image = (
         f'<img class="story-image" src="{html.escape(article.image_url, quote=True)}" alt="" '
         'loading="lazy" decoding="async" referrerpolicy="no-referrer">'
@@ -347,6 +358,77 @@ def render_card(story: Story) -> str:
         f'{story_content}'
         '</article>'
     )
+
+
+def render_story_page(story: Story) -> str:
+    article = story.latest
+    title = html.escape(article.title)
+    summary = (
+        html.escape(article.summary)
+        if article.summary else "No summary was provided in the RSS/Atom feed."
+    )
+    image = (
+        f'<img class="story-image" src="{html.escape(article.image_url, quote=True)}" alt="">'
+        if safe_image_url(article.image_url) else ""
+    )
+    published = article.published.strftime("%b %d, %Y at %H:%M UTC")
+    sources = []
+    for source in sorted(story.articles, key=lambda item: item.outlet.lower()):
+        outlet = html.escape(source.outlet)
+        link = safe_link(source.link)
+        source_link = (
+            f'<a href="{html.escape(link, quote=True)}" target="_blank" '
+            f'rel="noopener noreferrer">Read original article</a>'
+            if link else "Original article link unavailable"
+        )
+        sources.append(f'<li><strong>{outlet}</strong><span>{source_link}</span></li>')
+    source_list = "\n".join(sources)
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d1117">
+  <title>{title} · Top News</title>
+  <style>
+    :root {{ color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #e6edf3; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; padding: 24px 16px; }}
+    main {{ max-width: 760px; margin: 0 auto; }}
+    .back {{ color: #58a6ff; text-decoration: none; font-size: .9rem; }}
+    .back:hover, .back:focus-visible {{ text-decoration: underline; }}
+    article {{ margin-top: 20px; border: 1px solid #30363d; border-radius: 14px; padding: clamp(16px, 4vw, 28px); background: #161b22; }}
+    h1 {{ margin: 0; font-size: clamp(1.5rem, 6vw, 2.2rem); line-height: 1.25; }}
+    .meta {{ margin: 10px 0 0; color: #8b949e; font-size: .8rem; line-height: 1.5; }}
+    .story-image {{ display: block; width: 100%; max-height: 420px; margin: 20px 0; border-radius: 10px; object-fit: cover; }}
+    .summary {{ margin: 20px 0 0; color: #c9d1d9; font-size: 1rem; line-height: 1.7; }}
+    .notice {{ margin: 16px 0 0; color: #8b949e; font-size: .82rem; line-height: 1.5; }}
+    h2 {{ margin: 26px 0 10px; font-size: 1.05rem; }}
+    ul {{ display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }}
+    li {{ display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; border-top: 1px solid #30363d; padding-top: 10px; font-size: .86rem; }}
+    li span {{ color: #8b949e; }}
+    li a {{ color: #58a6ff; text-decoration: none; }}
+    li a:hover, li a:focus-visible {{ text-decoration: underline; }}
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="../index.html">← Back to Top News</a>
+    <article>
+      <h1>{title}</h1>
+      <p class="meta">RSS summary from {html.escape(article.outlet)} · {html.escape(published)}</p>
+      {image}
+      <p class="summary">{summary}</p>
+      <p class="notice">This page shows the available RSS/Atom summary, not a copy of the full publisher article. Read the original stories from the sources below.</p>
+      <section aria-labelledby="sources-title">
+        <h2 id="sources-title">Sources</h2>
+        <ul>{source_list}</ul>
+      </section>
+    </article>
+  </main>
+</body>
+</html>
+"""
 
 
 def render_section(
@@ -386,17 +468,17 @@ def render_section(
 
 def render_ticker(ranked_stories: list[tuple[Story, str]]) -> str:
     latest = sorted(
-        {story.latest.title: story.latest for story, _ in ranked_stories}.values(),
-        key=lambda article: article.published,
+        {story.latest.title: story for story, _ in ranked_stories}.values(),
+        key=lambda story: story.latest.published,
         reverse=True,
     )[:12]
     items = []
-    for article in latest:
+    for story in latest:
+        article = story.latest
         title = html.escape(article.title)
-        link = safe_link(article.link)
         linked_title = (
-            f'<a href="{html.escape(link, quote=True)}" rel="noopener noreferrer">{title}</a>'
-            if link else title
+            f'<a href="{html.escape(story_page_path(story), quote=True)}" '
+            f'target="_blank" rel="noopener noreferrer">{title}</a>'
         )
         published = article.published.strftime("%b %d, %H:%M UTC")
         items.append(
@@ -416,6 +498,14 @@ def render_page(
     live_news_url: str = "",
 ) -> str:
     sections, atlanta_stories = group_sections(ranked_stories)
+    story_page_links = {
+        article.link: story_page_path(story)
+        for story, _ in ranked_stories
+        for article in story.articles
+        if safe_link(article.link)
+    }
+    story_page_links_json = json.dumps(story_page_links, ensure_ascii=True)
+    story_page_links_json = story_page_links_json.replace("<", "\\u003c").replace("&", "\\u0026")
     regional_sections = "\n".join([
         render_section("us", "US", "The most widely covered US stories.", sections["us"]),
         render_section("europe", "Europe", "Major stories from across Europe.", sections["europe"]),
@@ -528,6 +618,7 @@ def render_page(
     {content}
     <footer>Updated {html.escape(timestamp)} · Summaries come from RSS/Atom feeds; region labels are inferred from headlines.</footer>
   </main>
+  <script type="application/json" id="story-page-links">{story_page_links_json}</script>
   <script>
     document.getElementById("refresh-dashboard").addEventListener("click", () => {{
       const url = new URL(window.location.href);
@@ -537,6 +628,7 @@ def render_page(
 
     const latestItems = document.getElementById("latest-items");
     const latestStatus = document.getElementById("latest-status");
+    const storyPageByLink = JSON.parse(document.getElementById("story-page-links").textContent);
     const liveNewsUrl = latestItems.dataset.liveUrl;
     if (liveNewsUrl) {{
       let isRefreshing = false;
@@ -563,7 +655,8 @@ def render_page(
             const headline = document.createElement("span");
             headline.className = "ticker-headline";
             const anchor = document.createElement("a");
-            anchor.href = link.href;
+            anchor.href = storyPageByLink[item.link] || storyPageByLink[link.href] || link.href;
+            anchor.target = "_blank";
             anchor.rel = "noopener noreferrer";
             anchor.textContent = item.title;
             headline.append(anchor);
@@ -630,6 +723,10 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
         raise ValueError("LIVE_NEWS_URL must be a valid HTTPS URL.")
     if live_news_url and urlsplit(live_news_url).scheme != "https":
         raise ValueError("LIVE_NEWS_URL must use HTTPS.")
+    for story, _ in ranked:
+        page_path = output_dir / story_page_path(story)
+        page_path.parent.mkdir(parents=True, exist_ok=True)
+        page_path.write_text(render_story_page(story), encoding="utf-8")
     (output_dir / "index.html").write_text(
         render_page(ranked, now, live_news_url), encoding="utf-8"
     )
