@@ -50,6 +50,8 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn("<script>", page)
         self.assertIn("&lt;script&gt;", page)
         self.assertNotIn('<p class="summary">', page)
+        self.assertIn("color-scheme: dark", page)
+        self.assertIn("#0d1117", page)
 
     def test_us_keywords_use_word_boundaries(self):
         self.assertTrue(is_us_related("Congress debates a new bill", ["Congress"]))

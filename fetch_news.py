@@ -281,40 +281,41 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101b2b">
+  <meta name="theme-color" content="#0d1117">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Top News">
   <link rel="manifest" href="manifest.webmanifest">
   <title>Top News</title>
   <style>
-    :root {{ color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f2f5f9; color: #182538; scroll-behavior: smooth; }}
+    :root {{ color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #e6edf3; scroll-behavior: smooth; }}
     * {{ box-sizing: border-box; }}
     body {{ margin: 0; padding: max(20px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }}
     main {{ max-width: 760px; margin: 0 auto; }}
     header {{ padding: 18px 4px 14px; }}
     h1 {{ margin: 0; font-size: clamp(1.8rem, 8vw, 2.5rem); letter-spacing: -.045em; }}
-    header p {{ margin: 8px 0 0; color: #65748b; font-size: .92rem; line-height: 1.5; }}
-    .section-nav {{ position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 16px; padding: 10px 16px; background: #f2f5f9eF; backdrop-filter: blur(12px); scrollbar-width: none; }}
-    .section-nav a {{ flex: 0 0 auto; border: 1px solid #dce3ed; border-radius: 999px; padding: 8px 12px; background: #fff; color: #26374e; font-size: .8rem; font-weight: 650; text-decoration: none; }}
-    .news-section {{ --accent: #315c91; scroll-margin-top: 70px; margin: 0 0 26px; }}
-    .section--europe {{ --accent: #287c89; }}
-    .section--middle-east {{ --accent: #b16a29; }}
-    .section--worth-a-look {{ --accent: #7753a4; }}
+    header p {{ margin: 8px 0 0; color: #8b949e; font-size: .92rem; line-height: 1.5; }}
+    .section-nav {{ position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 16px; padding: 10px 16px; background: #0d1117ed; backdrop-filter: blur(12px); scrollbar-width: none; }}
+    .section-nav a {{ flex: 0 0 auto; border: 1px solid #30363d; border-radius: 999px; padding: 8px 12px; background: #161b22; color: #e6edf3; font-size: .8rem; font-weight: 650; text-decoration: none; }}
+    .section-nav a:hover, .section-nav a:focus-visible {{ border-color: #58a6ff; outline: none; }}
+    .news-section {{ --accent: #58a6ff; scroll-margin-top: 70px; margin: 0 0 26px; }}
+    .section--europe {{ --accent: #39c5cf; }}
+    .section--middle-east {{ --accent: #d29922; }}
+    .section--worth-a-look {{ --accent: #bc8cff; }}
     .section-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left: 4px solid var(--accent); padding: 3px 4px 3px 12px; margin: 0 0 12px; }}
-    .section-heading h2 {{ margin: 0; color: #192b42; font-size: 1.35rem; letter-spacing: -.025em; }}
-    .section-heading p {{ margin: 4px 0 0; color: #6b7890; font-size: .8rem; line-height: 1.4; }}
-    .section-count {{ display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--accent) 12%, white); color: var(--accent); font-size: .78rem; font-weight: 750; }}
-    .story {{ background: white; border: 1px solid #e2e8f0; border-radius: 13px; padding: 15px; margin: 0 0 9px; box-shadow: 0 2px 8px #1720330a; }}
+    .section-heading h2 {{ margin: 0; color: #e6edf3; font-size: 1.35rem; letter-spacing: -.025em; }}
+    .section-heading p {{ margin: 4px 0 0; color: #8b949e; font-size: .8rem; line-height: 1.4; }}
+    .section-count {{ display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 50%; background: #21262d; color: var(--accent); font-size: .78rem; font-weight: 750; }}
+    .story {{ background: #161b22; border: 1px solid #30363d; border-radius: 13px; padding: 15px; margin: 0 0 9px; box-shadow: 0 2px 8px #0104095c; }}
     .story h3 {{ margin: 0; font-size: 1rem; line-height: 1.45; font-weight: 650; }}
-    .story a {{ color: #182f4e; text-decoration: none; }}
+    .story a {{ color: #e6edf3; text-decoration: none; }}
     .story a:active {{ color: var(--accent); }}
-    .meta {{ margin: 9px 0 0; color: #6c7a8e; font-size: .76rem; line-height: 1.5; }}
-    .badge {{ display: inline-block; margin: 0 6px 4px 0; border-radius: 999px; padding: 3px 8px; color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, white); font-size: .65rem; font-weight: 700; vertical-align: 2px; white-space: nowrap; }}
-    .empty {{ background: white; border: 1px solid #e2e8f0; border-radius: 13px; padding: 16px; color: #6b7890; font-size: .85rem; }}
+    .meta {{ margin: 9px 0 0; color: #8b949e; font-size: .76rem; line-height: 1.5; }}
+    .badge {{ display: inline-block; margin: 0 6px 4px 0; border: 1px solid #30363d; border-radius: 999px; padding: 3px 8px; color: var(--accent); background: #21262d; font-size: .65rem; font-weight: 700; vertical-align: 2px; white-space: nowrap; }}
+    .empty {{ background: #161b22; border: 1px solid #30363d; border-radius: 13px; padding: 16px; color: #8b949e; font-size: .85rem; }}
     .more {{ margin: 10px 0 0; }}
-    .more summary {{ padding: 10px 4px; color: #345b8b; font-size: .82rem; font-weight: 700; cursor: pointer; }}
-    footer {{ color: #78869a; font-size: .74rem; line-height: 1.5; padding: 10px 4px; }}
+    .more summary {{ padding: 10px 4px; color: #58a6ff; font-size: .82rem; font-weight: 700; cursor: pointer; }}
+    footer {{ color: #8b949e; font-size: .74rem; line-height: 1.5; padding: 10px 4px; }}
   </style>
 </head>
 <body>
@@ -370,8 +371,8 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
         "short_name": "Top News",
         "start_url": "./",
         "display": "standalone",
-        "background_color": "#f3f5f8",
-        "theme_color": "#101b2b",
+        "background_color": "#0d1117",
+        "theme_color": "#0d1117",
     }
     (output_dir / "manifest.webmanifest").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"

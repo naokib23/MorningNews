@@ -1,6 +1,6 @@
 # MorningNews
 
-A personal, headlines-only news dashboard that groups similar stories across outlets and organizes them into US, Europe, Middle East, and “Worth a look” sections. Its output is a static mobile-first page; it does not collect or publish article summaries.
+A personal, headlines-only news dashboard with a GitHub-inspired dark theme. It groups similar stories across outlets and organizes them into US, Europe, Middle East, and “Worth a look” sections. Its output is a static mobile-first page; it does not collect or publish article summaries.
 
 ## Set up GitHub Pages
 
