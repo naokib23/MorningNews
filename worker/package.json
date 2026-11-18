@@ -1,0 +1,11 @@
+{
+  "name": "morning-news-live",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "fast-xml-parser": "4.5.0"
+  }
+}

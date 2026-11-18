@@ -1,6 +1,6 @@
 # MorningNews
 
-A personal news dashboard with a GitHub-inspired dark theme. It groups similar stories across outlets, shows US, Europe, and Middle East in three columns, and places Other News below. On narrow screens, the regional columns can be swiped horizontally.
+A personal news dashboard with a GitHub-inspired dark theme. It groups similar stories across outlets, shows US, Europe, and Middle East in three columns, and places Other News below. A Latest ticker sits above the columns; on narrow screens, the regional columns and ticker can be swiped horizontally.
 
 ## Set up GitHub Pages
 
@@ -9,7 +9,19 @@ A personal news dashboard with a GitHub-inspired dark theme. It groups similar s
 3. The dashboard workflow deploys on a 30-minute schedule and can also be started with **Actions → Update news dashboard → Run workflow**.
 4. Open **Settings → Pages** for the published URL. On an iPhone, open that URL in Safari, tap **Share → Add to Home Screen**, and enable **Open as Web App** if offered. Tap **Refresh** on the dashboard to load the latest published snapshot.
 
-The schedule can start several minutes after a half-hour boundary because GitHub may delay scheduled jobs during high load. The Refresh button reloads the latest published dashboard; it does not start a feed fetch, so new headlines appear after the next scheduled deployment (or a manual Actions run). GitHub disables scheduled workflows in repositories with no activity for 60 days. The monthly keepalive workflow creates an empty commit on the default branch so this repository continues to have activity without adding generated HTML commits; it also has a manual dispatch for verification. Scheduled runs use GitHub-hosted runners and GitHub Pages; no server or secrets are required.
+The schedule can start several minutes after a half-hour boundary because GitHub may delay scheduled jobs during high load. The Refresh button reloads the latest published dashboard; it does not start a feed fetch, so new headlines appear after the next scheduled deployment (or a manual Actions run). GitHub disables scheduled workflows in repositories with no activity for 60 days. The monthly keepalive workflow creates an empty commit on the default branch so this repository continues to have activity without adding generated HTML commits; it also has a manual dispatch for verification. The scheduled dashboard uses GitHub-hosted runners and GitHub Pages; the optional live ticker backend requires Cloudflare setup described below.
+
+## Enable the near-live ticker
+
+The ticker initially uses the latest headlines from the scheduled dashboard build. The optional Cloudflare Worker refreshes the RSS/Atom feeds every five minutes and the page checks for updates once a minute. Source publishing and scheduled-job delays mean this is near-live, not instantaneous. Headlines are labeled **Latest** because most feeds do not reliably identify breaking news.
+
+1. In Cloudflare, create a Workers KV namespace and replace `REPLACE_WITH_CLOUDFLARE_KV_NAMESPACE_ID` in `worker/wrangler.toml` with its namespace ID.
+2. Create a Cloudflare API token with permission to edit Workers Scripts and Workers KV Storage for the account.
+3. In the repository’s **Settings → Secrets and variables → Actions**, add the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+4. Run **Actions → Deploy live news worker**. The first scheduled refresh can take up to five minutes.
+5. Add the repository Actions variable `LIVE_NEWS_URL` with the deployed worker URL ending in `/latest.json`, then run **Actions → Update news dashboard** so the page connects to it.
+
+Without these Cloudflare settings, the ticker continues to show the latest scheduled snapshot and the rest of the dashboard works normally. The Worker reads the public `feeds.json` generated alongside the dashboard. See [Cloudflare Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/) and [Worker KV](https://developers.cloudflare.com/kv/).
 
 The first Pages deployment may require an approval in the `github-pages` environment, depending on repository settings. A green build alone does not mean Pages is configured or that the site is publicly available.
 

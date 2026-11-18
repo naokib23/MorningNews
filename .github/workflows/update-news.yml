@@ -29,6 +29,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Build dashboard
+        env:
+          LIVE_NEWS_URL: ${{ vars.LIVE_NEWS_URL }}
         run: python fetch_news.py --output-dir dist
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

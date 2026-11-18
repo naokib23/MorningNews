@@ -1,0 +1,31 @@
+name: Check live news worker
+
+on:
+  push:
+    paths:
+      - "worker/**"
+      - ".github/workflows/check-live-news-worker.yml"
+  pull_request:
+    paths:
+      - "worker/**"
+      - ".github/workflows/check-live-news-worker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install worker dependencies
+        working-directory: worker
+        run: npm install --no-audit --no-fund
+      - name: Test feed parsing and ticker selection
+        working-directory: worker
+        run: npm test

@@ -8,6 +8,7 @@ import calendar
 import concurrent.futures
 import html
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -284,7 +285,37 @@ def render_section(
     )
 
 
-def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> str:
+def render_ticker(ranked_stories: list[tuple[Story, str]]) -> str:
+    latest = sorted(
+        {story.latest.title: story.latest for story, _ in ranked_stories}.values(),
+        key=lambda article: article.published,
+        reverse=True,
+    )[:12]
+    items = []
+    for article in latest:
+        title = html.escape(article.title)
+        link = safe_link(article.link)
+        linked_title = (
+            f'<a href="{html.escape(link, quote=True)}" rel="noopener noreferrer">{title}</a>'
+            if link else title
+        )
+        published = article.published.strftime("%b %d, %H:%M UTC")
+        items.append(
+            '<article class="ticker-item">'
+            f'<span class="ticker-headline">{linked_title}</span>'
+            f'<span class="ticker-source">{html.escape(article.outlet)} · {published}</span>'
+            '</article>'
+        )
+    if not items:
+        items.append('<p class="ticker-empty">No recent headlines available.</p>')
+    return "\n".join(items)
+
+
+def render_page(
+    ranked_stories: list[tuple[Story, str]],
+    updated: datetime,
+    live_news_url: str = "",
+) -> str:
     sections, worth_a_look = group_sections(ranked_stories)
     regional_sections = "\n".join([
         render_section("us", "US", "The most widely covered US stories.", [(story, "us") for story in sections["us"]]),
@@ -302,6 +333,8 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
         )
     )
     timestamp = updated.strftime("%b %d, %Y at %H:%M UTC")
+    ticker_status = "Connecting to live headlines…" if live_news_url else f"Scheduled snapshot · {timestamp}"
+    ticker = render_ticker(ranked_stories)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -331,6 +364,17 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
     .section--europe {{ --accent: #39c5cf; }}
     .section--middle-east {{ --accent: #d29922; }}
     .section--other-news {{ --accent: #bc8cff; }}
+    .latest-strip {{ margin: 0 0 20px; border: 1px solid #30363d; border-radius: 12px; background: #161b22; overflow: hidden; }}
+    .latest-header {{ display: flex; align-items: center; gap: 10px; padding: 10px 14px 0; }}
+    .latest-label {{ flex: 0 0 auto; color: #ff7b72; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }}
+    .latest-status {{ color: #8b949e; font-size: .72rem; }}
+    .ticker-track {{ display: flex; gap: 10px; overflow-x: auto; padding: 10px 14px 14px; scroll-snap-type: x mandatory; scrollbar-color: #30363d transparent; }}
+    .ticker-item {{ display: flex; flex: 0 0 min(340px, 82vw); flex-direction: column; justify-content: space-between; gap: 7px; min-height: 78px; border: 1px solid #30363d; border-radius: 9px; padding: 10px 12px; background: #0d1117; scroll-snap-align: start; }}
+    .ticker-headline {{ color: #e6edf3; font-size: .84rem; font-weight: 650; line-height: 1.4; }}
+    .ticker-headline a {{ color: inherit; text-decoration: none; }}
+    .ticker-headline a:hover, .ticker-headline a:focus-visible {{ color: #58a6ff; text-decoration: underline; }}
+    .ticker-source {{ color: #8b949e; font-size: .7rem; }}
+    .ticker-empty {{ margin: 0; color: #8b949e; font-size: .82rem; }}
     .regional-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 16px; }}
     .regional-grid .news-section {{ min-width: 0; }}
     .section-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left: 4px solid var(--accent); padding: 3px 4px 3px 12px; margin: 0 0 12px; }}
@@ -370,6 +414,15 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
       <a href="#middle-east">Middle East</a>
       <a href="#other-news">Other News</a>
     </nav>
+    <section class="latest-strip" aria-label="Latest headlines">
+      <div class="latest-header">
+        <span class="latest-label">Latest</span>
+        <span class="latest-status" id="latest-status" aria-live="polite">{html.escape(ticker_status)}</span>
+      </div>
+      <div class="ticker-track" id="latest-items" data-live-url="{html.escape(live_news_url, quote=True)}">
+        {ticker}
+      </div>
+    </section>
     {content}
     <footer>Updated {html.escape(timestamp)} · Summaries come from RSS/Atom feeds; region labels are inferred from headlines.</footer>
   </main>
@@ -379,6 +432,64 @@ def render_page(ranked_stories: list[tuple[Story, str]], updated: datetime) -> s
       url.searchParams.set("refresh", Date.now());
       window.location.replace(url.href);
     }});
+
+    const latestItems = document.getElementById("latest-items");
+    const latestStatus = document.getElementById("latest-status");
+    const liveNewsUrl = latestItems.dataset.liveUrl;
+    if (liveNewsUrl) {{
+      let isRefreshing = false;
+      async function refreshLatestHeadlines() {{
+        if (isRefreshing) return;
+        isRefreshing = true;
+        try {{
+          const response = await fetch(liveNewsUrl, {{ cache: "no-store" }});
+          if (!response.ok) throw new Error("Live headline request failed.");
+          const snapshot = await response.json();
+          if (!Array.isArray(snapshot.items)) throw new Error("Invalid live headline response.");
+          const fragment = document.createDocumentFragment();
+          for (const item of snapshot.items.slice(0, 12)) {{
+            if (!item || typeof item.title !== "string" || typeof item.link !== "string") continue;
+            let link;
+            try {{
+              link = new URL(item.link);
+              if (!["http:", "https:"].includes(link.protocol)) continue;
+            }} catch {{
+              continue;
+            }}
+            const card = document.createElement("article");
+            card.className = "ticker-item";
+            const headline = document.createElement("span");
+            headline.className = "ticker-headline";
+            const anchor = document.createElement("a");
+            anchor.href = link.href;
+            anchor.rel = "noopener noreferrer";
+            anchor.textContent = item.title;
+            headline.append(anchor);
+            const source = document.createElement("span");
+            source.className = "ticker-source";
+            const published = new Date(item.published_at);
+            const publishedText = Number.isNaN(published.getTime())
+              ? ""
+              : " · " + published.toLocaleTimeString([], {{ hour: "numeric", minute: "2-digit" }});
+            source.textContent = (typeof item.outlet === "string" ? item.outlet : "News") + publishedText;
+            card.append(headline, source);
+            fragment.append(card);
+          }}
+          if (!fragment.childNodes.length) throw new Error("No usable live headlines.");
+          latestItems.replaceChildren(fragment);
+          const updated = new Date(snapshot.updated_at);
+          latestStatus.textContent = Number.isNaN(updated.getTime())
+            ? "Live feed updated"
+            : "Live feed updated " + updated.toLocaleTimeString([], {{ hour: "numeric", minute: "2-digit" }});
+        }} catch {{
+          latestStatus.textContent = "Live feed unavailable · showing scheduled headlines";
+        }} finally {{
+          isRefreshing = false;
+        }}
+      }}
+      refreshLatestHeadlines();
+      window.setInterval(refreshLatestHeadlines, 60_000);
+    }}
   </script>
 </body>
 </html>
@@ -412,7 +523,21 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
     now = datetime.now(timezone.utc)
     ranked = rank_stories(cluster_articles(articles), keywords, now, region_keywords)
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "index.html").write_text(render_page(ranked, now), encoding="utf-8")
+    live_news_url = os.environ.get("LIVE_NEWS_URL", "").strip()
+    if live_news_url and safe_link(live_news_url) != live_news_url:
+        raise ValueError("LIVE_NEWS_URL must be a valid HTTPS URL.")
+    if live_news_url and urlsplit(live_news_url).scheme != "https":
+        raise ValueError("LIVE_NEWS_URL must use HTTPS.")
+    (output_dir / "index.html").write_text(
+        render_page(ranked, now, live_news_url), encoding="utf-8"
+    )
+    (output_dir / "feeds.json").write_text(
+        json.dumps(
+            [{"name": feed["name"], "url": feed["url"]} for feed in feeds],
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
     manifest = {
         "name": "Top News",
         "short_name": "Top News",

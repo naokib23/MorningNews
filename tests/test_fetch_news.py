@@ -1,9 +1,15 @@
+import json
+from types import SimpleNamespace
+import tempfile
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import patch
 
 from fetch_news import (
     Article,
     Story,
+    build_dashboard,
     cluster_articles,
     clean_summary,
     group_sections,
@@ -60,6 +66,43 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('id="refresh-dashboard"', page)
         self.assertIn('url.searchParams.set("refresh", Date.now())', page)
         self.assertIn("window.location.replace(url.href)", page)
+
+    def test_latest_ticker_starts_with_snapshot_and_can_poll_live_feed(self):
+        story = Story([self.article("A developing story", "Outlet", summary="Details")])
+        page = render_page(
+            [(story, "us")],
+            self.now,
+            "https://morning-news-live.example.workers.dev/latest.json",
+        )
+        self.assertIn('aria-label="Latest headlines"', page)
+        self.assertIn('data-live-url="https://morning-news-live.example.workers.dev/latest.json"', page)
+        self.assertIn("A developing story", page)
+        self.assertIn("window.setInterval(refreshLatestHeadlines, 60_000)", page)
+        self.assertIn("Live feed unavailable · showing scheduled headlines", page)
+
+    def test_build_publishes_feed_configuration_for_live_worker(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config = root / "feeds.yaml"
+            config.write_text(json.dumps({
+                "feeds": [{
+                    "name": "Example News",
+                    "url": "https://example.com/feed.xml",
+                }],
+            }), encoding="utf-8")
+            output = root / "dist"
+            with patch.dict("sys.modules", {"yaml": SimpleNamespace(safe_load=json.loads)}), \
+                    patch("fetch_news.fetch_feed", return_value=[
+                        self.article("Latest headline", "Example News")
+                    ]):
+                build_dashboard(config, output)
+
+            feeds = json.loads((output / "feeds.json").read_text(encoding="utf-8"))
+            self.assertEqual(feeds, [{
+                "name": "Example News",
+                "url": "https://example.com/feed.xml",
+            }])
+            self.assertTrue((output / "index.html").exists())
 
     def test_feed_summaries_are_cleaned_and_capped(self):
         self.assertEqual(clean_summary("<p>Short &amp; useful.</p>"), "Short & useful.")
