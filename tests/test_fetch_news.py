@@ -111,7 +111,6 @@ class DashboardTests(unittest.TestCase):
     def test_weather_and_market_panels_are_full_width_and_stacked_above_news(self):
         page = render_page([], self.now, alerts=[])
         forecast_start = page.index('class="forecast"')
-        gas_start = page.index('class="gas-strip"')
         market_start = page.index('class="market-strip"')
         news_nav_start = page.index('<nav class="section-nav"')
 
@@ -119,36 +118,26 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn("open-utility-drawer", page)
         self.assertNotIn("utility-summary-grid", page)
         self.assertNotIn("utility-panel-grid", page)
+        self.assertNotIn("gas-strip", page)
         self.assertLess(page.index('class="weather-alerts"'), forecast_start)
-        self.assertLess(forecast_start, gas_start)
-        self.assertLess(gas_start, market_start)
+        self.assertLess(forecast_start, market_start)
         self.assertLess(market_start, news_nav_start)
         self.assertIn('class="regional-grid"', page)
         self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", page)
 
-    def test_lower_atlantic_gas_panel_links_to_worker_and_states_coverage(self):
+    def test_dashboard_does_not_render_or_poll_gas_price_endpoint(self):
         page = render_page(
             [],
             self.now,
             "https://morning-news-live.example.workers.dev/latest.json",
         )
         self.assertIn(
-            'data-live-url="https://morning-news-live.example.workers.dev/gas.json"',
+            'data-live-url="https://morning-news-live.example.workers.dev/latest.json"',
             page,
         )
-        self.assertIn("Weekly gas price · Lower Atlantic", page)
-        self.assertIn(
-            "https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&amp;s=EMM_EPMRU_PTE_R1Z_DPG&amp;f=W",
-            page,
-        )
-        self.assertIn("PADD 1C (Lower Atlantic) weekly regular-gasoline retail price", page)
-        self.assertIn("not Atlanta or Georgia-specific", page)
-        self.assertIn("refreshGasPrice()", page)
-
-    def test_gas_panel_explains_api_key_setup_when_worker_is_not_configured(self):
-        page = render_page([], self.now)
-        self.assertIn("Add an EIA API key to the live Worker", page)
-        self.assertIn('data-live-url=""', page)
+        self.assertNotIn("gas.json", page)
+        self.assertNotIn("EIA", page)
+        self.assertNotIn("refreshGasPrice", page)
 
     def test_header_lists_configured_sources_with_brief_copy(self):
         page = render_page(

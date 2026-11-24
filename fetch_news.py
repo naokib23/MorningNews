@@ -686,16 +686,6 @@ def render_page(
     timestamp = updated.strftime("%b %d, %Y at %H:%M UTC")
     ticker_status = "Connecting to live headlines…" if live_news_url else f"Scheduled snapshot · {timestamp}"
     ticker = render_ticker(ranked_stories)
-    gas_price_url = (
-        live_news_url.rsplit("/latest.json", 1)[0] + "/gas.json"
-        if live_news_url.endswith("/latest.json")
-        else ""
-    )
-    gas_status = (
-        "Loading weekly estimate…"
-        if gas_price_url
-        else "Add an EIA API key to the live Worker to enable this estimate."
-    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -753,14 +743,6 @@ def render_page(
     .weather-alert h3 {{ margin: 3px 0; font-size: .85rem; }}
     .weather-alert p {{ margin: 4px 0; color: #c9d1d9; font-size: .78rem; line-height: 1.4; }}
     .weather-alert .weather-alert-area {{ color: #8b949e; font-size: .7rem; }}
-    .gas-strip {{ margin: 0 0 18px; border: 1px solid #30363d; border-radius: 12px; padding: 12px; background: #161b22; }}
-    .gas-heading {{ display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }}
-    .gas-heading h2 {{ margin: 0; font-size: 1rem; }}
-    .gas-status, .gas-credit, .gas-disclaimer {{ color: #8b949e; font-size: .7rem; }}
-    .gas-price {{ margin: 10px 0 4px; color: #e6edf3; font-size: 1.6rem; font-weight: 750; }}
-    .gas-credit {{ margin: 5px 0 0; }}
-    .gas-credit a {{ color: #8b949e; }}
-    .gas-disclaimer {{ margin: 6px 0 0; line-height: 1.45; }}
     .market-strip {{ margin: 0 0 18px; border: 1px solid #30363d; border-radius: 12px; padding: 12px; background: #161b22; }}
     .market-heading {{ display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 10px; }}
     .market-heading h2 {{ margin: 0; font-size: 1rem; }}
@@ -832,18 +814,6 @@ def render_page(
     </header>
     {render_weather_alerts(alerts)}
     {render_forecast(forecast)}
-    <section class="gas-strip" aria-labelledby="gas-title">
-      <div class="gas-heading">
-        <h2 id="gas-title">Weekly gas price · Lower Atlantic</h2>
-        <span class="gas-status" id="gas-status" aria-live="polite">{html.escape(gas_status)}</span>
-      </div>
-      <p class="gas-price" id="gas-price" data-live-url="{html.escape(gas_price_url, quote=True)}">
-        Configure an EIA API key to load this estimate.
-      </p>
-      <p class="gas-credit"><a href="https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&amp;s=EMM_EPMRU_PTE_R1Z_DPG&amp;f=W"
-        target="_blank" rel="noopener noreferrer">EIA Lower Atlantic price series</a></p>
-      <p class="gas-disclaimer">PADD 1C (Lower Atlantic) weekly regular-gasoline retail price; this is a multi-state regional estimate, not Atlanta or Georgia-specific.</p>
-    </section>
     <section class="market-strip" aria-labelledby="market-title">
       <div class="market-heading">
         <h2 id="market-title">Market movers</h2>
@@ -943,31 +913,6 @@ def render_page(
       window.setInterval(refreshLatestHeadlines, 60_000);
     }}
 
-    const gasPrice = document.getElementById("gas-price");
-    const gasStatus = document.getElementById("gas-status");
-    const gasPriceUrl = gasPrice.dataset.liveUrl;
-    if (gasPriceUrl) {{
-      async function refreshGasPrice() {{
-        try {{
-          const response = await fetch(gasPriceUrl, {{ cache: "no-store" }});
-          if (!response.ok) throw new Error("Gas-price request failed.");
-          const snapshot = await response.json();
-          if (!Number.isFinite(snapshot.price)
-            || typeof snapshot.period !== "string"
-            || !/^\\d{{4}}-\\d{{2}}-\\d{{2}}$/.test(snapshot.period)) {{
-            throw new Error("Invalid gas-price response.");
-          }}
-          gasPrice.textContent = "$" + snapshot.price.toFixed(3) + " / gallon";
-          gasStatus.textContent = "Week of " + new Date(snapshot.period + "T12:00:00")
-            .toLocaleDateString([], {{ month: "short", day: "numeric", year: "numeric" }});
-        }} catch {{
-          gasPrice.textContent = "Weekly estimate unavailable";
-          gasStatus.textContent = "EIA data not configured";
-        }}
-      }}
-      refreshGasPrice();
-      window.setInterval(refreshGasPrice, 30 * 60_000);
-    }}
   </script>
 </body>
 </html>

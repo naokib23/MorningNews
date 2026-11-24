@@ -23,11 +23,11 @@ The ticker initially uses the latest headlines from the scheduled dashboard buil
 
 Without these Cloudflare settings, the ticker continues to show the latest scheduled snapshot and the rest of the dashboard works normally. The Worker reads the public `feeds.json` generated alongside the dashboard. See [Cloudflare Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/) and [Worker KV](https://developers.cloudflare.com/kv/).
 
-## Market movers and gas prices
+## Market movers and gas-price API
 
 The Market movers panel uses TradingView's official U.S. stock market-movers widget. It requires no API key; market-data availability and delay vary by exchange. TradingView provides its own branding and links, and the panel is informational rather than investment advice. The widget loads directly from TradingView, so it needs an internet connection and may not appear if third-party content is blocked.
 
-The gas-price panel uses EIA's weekly regular-gasoline retail price for PADD 1C (Lower Atlantic), a multi-state region that includes Georgia but is not Atlanta- or Georgia-specific. The EIA dataset does not publish a Georgia statewide price. To enable the regional estimate, obtain a free EIA API key and add it as the `EIA_API_KEY` Worker secret under **Workers & Pages → morning-news-live → Settings → Variables and Secrets**. The Worker checks EIA at most once per day; the source itself updates weekly. Without the secret, the panel clearly reports that EIA data is not configured.
+The gas-price section is currently hidden from the dashboard. The live Worker still supports `/gas.json`, using EIA's weekly regular-gasoline retail price for PADD 1C (Lower Atlantic), a multi-state region that includes Georgia but is not Atlanta- or Georgia-specific. The EIA dataset does not publish a Georgia statewide price. To enable the endpoint, obtain a free EIA API key and add it as the `EIA_API_KEY` Worker secret under **Workers & Pages → morning-news-live → Settings → Variables and Secrets**. The Worker checks EIA at most once per day; the source itself updates weekly.
 
 The first Pages deployment may require an approval in the `github-pages` environment, depending on repository settings. A green build alone does not mean Pages is configured or that the site is publicly available.
 
