@@ -738,6 +738,7 @@ def render_page(
     .forecast-credit:hover, .forecast-credit:focus-visible {{ color: #58a6ff; text-decoration: underline; }}
     .utility-panel-grid {{ display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); align-items: start; gap: 12px; margin: 0 0 18px; }}
     .utility-summary-grid {{ display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(200px, .75fr); align-items: start; gap: 12px; }}
+    .utility-panel-grid > *, .utility-summary-grid > * {{ min-width: 0; }}
     .utility-summary-grid .forecast, .utility-summary-grid .gas-strip, .utility-panel-grid .market-strip {{ margin: 0; }}
     .weather-alerts {{ margin: 0 0 12px; }}
     .weather-alerts-heading {{ display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 8px; }}

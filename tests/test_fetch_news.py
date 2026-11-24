@@ -122,6 +122,7 @@ class DashboardTests(unittest.TestCase):
         self.assertLess(utility_start, news_nav_start)
         self.assertIn("utility-summary-grid", page)
         self.assertIn("utility-panel-grid", page)
+        self.assertIn(".utility-panel-grid > *, .utility-summary-grid > *", page)
         self.assertIn('class="regional-grid"', page)
         self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", page)
 
