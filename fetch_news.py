@@ -746,8 +746,8 @@ def render_page(
     .market-strip {{ margin: 0 0 18px; border: 1px solid #30363d; border-radius: 12px; padding: 12px; background: #161b22; }}
     .market-heading {{ display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 10px; }}
     .market-heading h2 {{ margin: 0; font-size: 1rem; }}
-    .market-widget {{ overflow: hidden; min-height: 440px; border: 1px solid #30363d; border-radius: 9px; background: #0d1117; }}
-    .market-widget tv-market-overview {{ display: block; min-height: 440px; width: 100%; }}
+    .market-widget {{ overflow: hidden; min-height: 300px; border: 1px solid #30363d; border-radius: 9px; background: #0d1117; }}
+    .market-widget tv-market-overview {{ display: block; min-height: 300px; width: 100%; }}
     .market-attribution, .market-disclaimer {{ color: #8b949e; font-size: .7rem; }}
     .market-attribution {{ margin: 8px 2px 0; }}
     .market-attribution a {{ color: #8b949e; }}
@@ -796,7 +796,7 @@ def render_page(
     @media (max-width: 700px) {{
       main {{ max-width: 760px; }}
       .forecast-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(88px, 1fr); grid-template-columns: none; overflow-x: auto; padding-bottom: 4px; scrollbar-color: #30363d transparent; }}
-      .market-widget, .market-widget tv-market-overview {{ min-height: 410px; }}
+      .market-widget, .market-widget tv-market-overview {{ min-height: 300px; }}
       .regional-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(84vw, 1fr); grid-template-columns: none; overflow-x: auto; margin: 0 -16px 22px; padding: 0 16px 10px; scroll-snap-type: x mandatory; scrollbar-color: #30363d transparent; }}
       .regional-grid .news-section {{ scroll-snap-align: start; }}
     }}
@@ -820,7 +820,7 @@ def render_page(
       </div>
       <div class="market-widget">
         <tv-market-overview mode="market-movers" exchange="US" symbol-sectors="[]"
-          time-frame="12M" item-size="normal" assets-type="stocks" chart-size="normal"
+          time-frame="12M" item-size="compact" assets-type="stocks" chart-size="compact"
           theme="dark">
           <p class="market-disclaimer">Loading U.S. stock movers…</p>
         </tv-market-overview>
