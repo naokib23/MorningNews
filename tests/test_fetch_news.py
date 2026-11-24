@@ -108,21 +108,21 @@ class DashboardTests(unittest.TestCase):
             page,
         )
 
-    def test_weather_and_market_panels_are_visible_above_unchanged_news_columns(self):
+    def test_weather_and_market_panels_are_full_width_and_stacked_above_news(self):
         page = render_page([], self.now, alerts=[])
-        utility_start = page.index('<div class="utility-panel-grid">')
+        forecast_start = page.index('class="forecast"')
+        gas_start = page.index('class="gas-strip"')
+        market_start = page.index('class="market-strip"')
         news_nav_start = page.index('<nav class="section-nav"')
 
         self.assertNotIn("<dialog", page)
         self.assertNotIn("open-utility-drawer", page)
-        self.assertIn('class="forecast"', page[utility_start:news_nav_start])
-        self.assertIn('class="gas-strip"', page[utility_start:news_nav_start])
-        self.assertIn('class="market-strip"', page[utility_start:news_nav_start])
-        self.assertLess(page.index('class="weather-alerts"'), utility_start)
-        self.assertLess(utility_start, news_nav_start)
-        self.assertIn("utility-summary-grid", page)
-        self.assertIn("utility-panel-grid", page)
-        self.assertIn(".utility-panel-grid > *, .utility-summary-grid > *", page)
+        self.assertNotIn("utility-summary-grid", page)
+        self.assertNotIn("utility-panel-grid", page)
+        self.assertLess(page.index('class="weather-alerts"'), forecast_start)
+        self.assertLess(forecast_start, gas_start)
+        self.assertLess(gas_start, market_start)
+        self.assertLess(market_start, news_nav_start)
         self.assertIn('class="regional-grid"', page)
         self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", page)
 

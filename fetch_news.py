@@ -736,10 +736,6 @@ def render_page(
     .forecast-unavailable {{ margin: 0; color: #8b949e; font-size: .8rem; }}
     .forecast-credit {{ display: inline-block; margin-top: 10px; color: #8b949e; font-size: .68rem; text-decoration: none; }}
     .forecast-credit:hover, .forecast-credit:focus-visible {{ color: #58a6ff; text-decoration: underline; }}
-    .utility-panel-grid {{ display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); align-items: start; gap: 12px; margin: 0 0 18px; }}
-    .utility-summary-grid {{ display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(200px, .75fr); align-items: start; gap: 12px; }}
-    .utility-panel-grid > *, .utility-summary-grid > * {{ min-width: 0; }}
-    .utility-summary-grid .forecast, .utility-summary-grid .gas-strip, .utility-panel-grid .market-strip {{ margin: 0; }}
     .weather-alerts {{ margin: 0 0 12px; }}
     .weather-alerts-heading {{ display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 8px; }}
     .weather-alerts-heading h2 {{ margin: 0; font-size: .95rem; }}
@@ -815,21 +811,12 @@ def render_page(
     .more {{ margin: 10px 0 0; }}
     .more summary {{ padding: 10px 4px; color: #58a6ff; font-size: .82rem; font-weight: 700; cursor: pointer; }}
     footer {{ color: #8b949e; font-size: .74rem; line-height: 1.5; padding: 10px 4px; }}
-    @media (max-width: 900px) {{
-      .utility-panel-grid {{ grid-template-columns: 1fr; }}
-    }}
     @media (max-width: 700px) {{
       main {{ max-width: 760px; }}
       .forecast-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(88px, 1fr); grid-template-columns: none; overflow-x: auto; padding-bottom: 4px; scrollbar-color: #30363d transparent; }}
       .market-widget, .market-widget tv-market-overview {{ min-height: 410px; }}
-      .utility-summary-grid {{ grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); }}
-      .gas-heading {{ align-items: flex-start; flex-direction: column; gap: 4px; }}
       .regional-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(84vw, 1fr); grid-template-columns: none; overflow-x: auto; margin: 0 -16px 22px; padding: 0 16px 10px; scroll-snap-type: x mandatory; scrollbar-color: #30363d transparent; }}
       .regional-grid .news-section {{ scroll-snap-align: start; }}
-    }}
-    @media (max-width: 360px) {{
-      .header-row {{ flex-wrap: wrap; }}
-      .utility-summary-grid {{ grid-template-columns: 1fr; }}
     }}
   </style>
 </head>
@@ -844,38 +831,34 @@ def render_page(
       {source_disclosure}
     </header>
     {render_weather_alerts(alerts)}
-    <div class="utility-panel-grid">
-      <div class="utility-summary-grid">
-        {render_forecast(forecast)}
-        <section class="gas-strip" aria-labelledby="gas-title">
-          <div class="gas-heading">
-            <h2 id="gas-title">Weekly gas price · Lower Atlantic</h2>
-            <span class="gas-status" id="gas-status" aria-live="polite">{html.escape(gas_status)}</span>
-          </div>
-          <p class="gas-price" id="gas-price" data-live-url="{html.escape(gas_price_url, quote=True)}">
-            Configure an EIA API key to load this estimate.
-          </p>
-          <p class="gas-credit"><a href="https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&amp;s=EMM_EPMRU_PTE_R1Z_DPG&amp;f=W"
-            target="_blank" rel="noopener noreferrer">EIA Lower Atlantic price series</a></p>
-          <p class="gas-disclaimer">PADD 1C (Lower Atlantic) weekly regular-gasoline retail price; this is a multi-state regional estimate, not Atlanta or Georgia-specific.</p>
-        </section>
+    {render_forecast(forecast)}
+    <section class="gas-strip" aria-labelledby="gas-title">
+      <div class="gas-heading">
+        <h2 id="gas-title">Weekly gas price · Lower Atlantic</h2>
+        <span class="gas-status" id="gas-status" aria-live="polite">{html.escape(gas_status)}</span>
       </div>
-      <section class="market-strip" aria-labelledby="market-title">
-        <div class="market-heading">
-          <h2 id="market-title">Market movers</h2>
-        </div>
-        <div class="market-widget">
-          <tv-market-overview mode="market-movers" exchange="US" symbol-sectors="[]"
-            time-frame="12M" item-size="normal" assets-type="stocks" chart-size="normal"
-            theme="dark">
-            <p class="market-disclaimer">Loading U.S. stock movers…</p>
-          </tv-market-overview>
-        </div>
-        <p class="market-attribution"><a href="https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/"
-          target="_blank" rel="noopener noreferrer">Market data by TradingView</a></p>
-        <p class="market-disclaimer">Data availability and delay vary by exchange. For information only—not investment advice.</p>
-      </section>
-    </div>
+      <p class="gas-price" id="gas-price" data-live-url="{html.escape(gas_price_url, quote=True)}">
+        Configure an EIA API key to load this estimate.
+      </p>
+      <p class="gas-credit"><a href="https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&amp;s=EMM_EPMRU_PTE_R1Z_DPG&amp;f=W"
+        target="_blank" rel="noopener noreferrer">EIA Lower Atlantic price series</a></p>
+      <p class="gas-disclaimer">PADD 1C (Lower Atlantic) weekly regular-gasoline retail price; this is a multi-state regional estimate, not Atlanta or Georgia-specific.</p>
+    </section>
+    <section class="market-strip" aria-labelledby="market-title">
+      <div class="market-heading">
+        <h2 id="market-title">Market movers</h2>
+      </div>
+      <div class="market-widget">
+        <tv-market-overview mode="market-movers" exchange="US" symbol-sectors="[]"
+          time-frame="12M" item-size="normal" assets-type="stocks" chart-size="normal"
+          theme="dark">
+          <p class="market-disclaimer">Loading U.S. stock movers…</p>
+        </tv-market-overview>
+      </div>
+      <p class="market-attribution"><a href="https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/"
+        target="_blank" rel="noopener noreferrer">Market data by TradingView</a></p>
+      <p class="market-disclaimer">Data availability and delay vary by exchange. For information only—not investment advice.</p>
+    </section>
     <nav class="section-nav" aria-label="News sections">
       <a href="#us">US</a>
       <a href="#europe">Europe</a>
