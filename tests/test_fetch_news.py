@@ -20,6 +20,7 @@ from fetch_news import (
     render_page,
     render_card,
     fetch_atlanta_forecast,
+    fetch_atlanta_alerts,
 )
 
 
@@ -122,6 +123,52 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("Forecast unavailable right now.", page)
         self.assertIn("https://open-meteo.com/", page)
 
+    def test_weather_alert_panel_shows_clear_no_alert_and_active_states(self):
+        no_alerts_page = render_page([], self.now, alerts=[])
+        self.assertIn("No active alerts for Atlanta, Georgia.", no_alerts_page)
+        alert = {
+            "event": "Severe Thunderstorm Warning",
+            "headline": "Severe storms with damaging winds",
+            "severity": "Severe",
+            "area": "Fulton County",
+            "url": "https://api.weather.gov/alerts/123",
+        }
+        active_page = render_page([], self.now, alerts=[alert])
+        self.assertIn("weather-alert--severe", active_page)
+        self.assertIn("Severe storms with damaging winds", active_page)
+        self.assertIn("Fulton County", active_page)
+        self.assertIn('href="https://api.weather.gov/alerts/123"', active_page)
+        self.assertLess(
+            active_page.index('class="weather-alerts"'),
+            active_page.index('class="forecast"'),
+        )
+
+    def test_weather_alerts_api_parses_active_alerts_and_escapes_content(self):
+        response = Mock()
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.read.return_value = json.dumps({
+            "features": [{
+                "id": "https://api.weather.gov/alerts/123",
+                "properties": {
+                    "event": "Severe Thunderstorm Warning",
+                    "headline": "Storms & wind <danger>",
+                    "severity": "Severe",
+                    "areaDesc": "Fulton County",
+                },
+            }],
+        }).encode("utf-8")
+        with patch("fetch_news.urllib.request.urlopen", return_value=response) as urlopen:
+            alerts = fetch_atlanta_alerts()
+
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]["severity"], "Severe")
+        self.assertEqual(alerts[0]["url"], "https://api.weather.gov/alerts/123")
+        self.assertEqual(urlopen.call_args.kwargs["timeout"], 8)
+        rendered = render_page([], self.now, alerts=alerts)
+        self.assertIn("Storms &amp; wind &lt;danger&gt;", rendered)
+        self.assertNotIn("Storms & wind <danger>", rendered)
+
     def test_forecast_api_returns_seven_formatted_days(self):
         response = Mock()
         response.__enter__ = Mock(return_value=response)
@@ -176,7 +223,8 @@ class DashboardTests(unittest.TestCase):
                     patch("fetch_news.fetch_feed", return_value=[
                         self.article("Latest headline", "Example News")
                     ]), \
-                    patch("fetch_news.fetch_atlanta_forecast", side_effect=TimeoutError):
+                    patch("fetch_news.fetch_atlanta_forecast", side_effect=TimeoutError), \
+                    patch("fetch_news.fetch_atlanta_alerts", side_effect=TimeoutError):
                 build_dashboard(config, output)
 
             feeds = json.loads((output / "feeds.json").read_text(encoding="utf-8"))
@@ -188,6 +236,7 @@ class DashboardTests(unittest.TestCase):
             self.assertIn("Sources (1)", page)
             self.assertIn("<li>Example News</li>", page)
             self.assertIn("Forecast unavailable right now.", page)
+            self.assertIn("Alerts temporarily unavailable.", page)
             self.assertFalse((output / "articles").exists())
 
     def test_feed_summaries_are_cleaned_and_capped(self):

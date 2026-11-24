@@ -39,6 +39,9 @@ ATLANTA_FORECAST_URL = (
     "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
     "&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=7"
 )
+ATLANTA_ALERTS_URL = "https://api.weather.gov/alerts/active?point=33.749,-84.388"
+NWS_ALERTS_URL = "https://www.weather.gov/ffc/"
+ALERT_SEVERITIES = {"Extreme", "Severe", "Moderate", "Minor", "Unknown"}
 WEATHER_CODES = {
     0: ("Clear", "☀️"),
     1: ("Mostly clear", "🌤️"),
@@ -413,6 +416,42 @@ def fetch_atlanta_forecast(timeout: int = 8) -> list[dict]:
     return forecast
 
 
+def fetch_atlanta_alerts(timeout: int = 8) -> list[dict]:
+    request = urllib.request.Request(
+        ATLANTA_ALERTS_URL,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/geo+json"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        payload = json.loads(response.read())
+
+    features = payload.get("features") if isinstance(payload, dict) else None
+    if not isinstance(features, list):
+        raise ValueError("Weather service returned an invalid alerts response.")
+
+    alerts = []
+    for feature in features:
+        properties = feature.get("properties") if isinstance(feature, dict) else None
+        if not isinstance(properties, dict):
+            raise ValueError("Weather service returned an invalid alert.")
+        event = properties.get("event")
+        headline = properties.get("headline") or event
+        if not isinstance(headline, str) or not headline.strip():
+            continue
+        severity = properties.get("severity")
+        if not isinstance(severity, str) or severity not in ALERT_SEVERITIES:
+            severity = "Unknown"
+        area = properties.get("areaDesc")
+        raw_url = feature.get("id")
+        alerts.append({
+            "event": event[:120] if isinstance(event, str) else "Weather alert",
+            "headline": headline.strip()[:240],
+            "severity": severity,
+            "area": area[:200] if isinstance(area, str) else "",
+            "url": safe_link(raw_url) if isinstance(raw_url, str) else "",
+        })
+    return alerts
+
+
 def render_card(story: Story) -> str:
     article = story.latest
     title = html.escape(article.title)
@@ -554,12 +593,56 @@ def render_forecast(forecast: list[dict] | None) -> str:
     )
 
 
+def render_weather_alerts(alerts: list[dict] | None) -> str:
+    if alerts is None:
+        message = (
+            '<p class="weather-alert-status">Alerts temporarily unavailable. '
+            'Check the National Weather Service for current information.</p>'
+        )
+    elif not alerts:
+        message = '<p class="weather-alert-status">No active alerts for Atlanta, Georgia.</p>'
+    else:
+        alert_cards = []
+        for alert in alerts:
+            severity = alert["severity"]
+            severity_class = severity.lower()
+            event = html.escape(alert["event"])
+            headline = html.escape(alert["headline"])
+            area = html.escape(alert["area"])
+            details = (
+                f'<a href="{html.escape(alert["url"], quote=True)}" '
+                'target="_blank" rel="noopener noreferrer">NWS details</a>'
+                if alert["url"] else ""
+            )
+            area_line = f'<p class="weather-alert-area">{area}</p>' if area else ""
+            alert_cards.append(
+                f'<article class="weather-alert weather-alert--{severity_class}">'
+                f'<span class="weather-alert-severity">{html.escape(severity)}</span>'
+                f'<h3>{event}</h3>'
+                f'<p>{headline}</p>'
+                f'{area_line}{details}'
+                '</article>'
+            )
+        message = f'<div class="weather-alert-list">{"".join(alert_cards)}</div>'
+    return (
+        '<section class="weather-alerts" aria-labelledby="weather-alerts-title">'
+        '<div class="weather-alerts-heading">'
+        '<h2 id="weather-alerts-title">Atlanta weather alerts</h2>'
+        f'<a href="{NWS_ALERTS_URL}" target="_blank" rel="noopener noreferrer">'
+        'National Weather Service</a>'
+        '</div>'
+        f'{message}'
+        '</section>'
+    )
+
+
 def render_page(
     ranked_stories: list[tuple[Story, str]],
     updated: datetime,
     live_news_url: str = "",
     source_names: list[str] | None = None,
     forecast: list[dict] | None = None,
+    alerts: list[dict] | None = None,
 ) -> str:
     sections, atlanta_stories = group_sections(ranked_stories)
     if source_names is None:
@@ -633,6 +716,23 @@ def render_page(
     .forecast-unavailable {{ margin: 0; color: #8b949e; font-size: .8rem; }}
     .forecast-credit {{ display: inline-block; margin-top: 10px; color: #8b949e; font-size: .68rem; text-decoration: none; }}
     .forecast-credit:hover, .forecast-credit:focus-visible {{ color: #58a6ff; text-decoration: underline; }}
+    .weather-alerts {{ margin: 0 0 12px; }}
+    .weather-alerts-heading {{ display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 8px; }}
+    .weather-alerts-heading h2 {{ margin: 0; font-size: .95rem; }}
+    .weather-alerts-heading a, .weather-alert a {{ color: #58a6ff; font-size: .72rem; text-decoration: none; }}
+    .weather-alerts-heading a:hover, .weather-alert a:hover {{ text-decoration: underline; }}
+    .weather-alert-status {{ margin: 0; border: 1px solid #30363d; border-radius: 9px; padding: 10px 12px; background: #161b22; color: #8b949e; font-size: .78rem; }}
+    .weather-alert-list {{ display: grid; gap: 8px; }}
+    .weather-alert {{ border: 1px solid #d29922; border-left-width: 4px; border-radius: 10px; padding: 10px 12px; background: #161b22; }}
+    .weather-alert--extreme, .weather-alert--severe {{ border-color: #f85149; }}
+    .weather-alert--moderate {{ border-color: #d29922; }}
+    .weather-alert--minor {{ border-color: #58a6ff; }}
+    .weather-alert-severity {{ color: #f0883e; font-size: .67rem; font-weight: 750; text-transform: uppercase; }}
+    .weather-alert--extreme .weather-alert-severity, .weather-alert--severe .weather-alert-severity {{ color: #ff7b72; }}
+    .weather-alert--minor .weather-alert-severity {{ color: #58a6ff; }}
+    .weather-alert h3 {{ margin: 3px 0; font-size: .85rem; }}
+    .weather-alert p {{ margin: 4px 0; color: #c9d1d9; font-size: .78rem; line-height: 1.4; }}
+    .weather-alert .weather-alert-area {{ color: #8b949e; font-size: .7rem; }}
     .refresh-button {{ flex: 0 0 auto; min-height: 44px; border: 1px solid #30363d; border-radius: 999px; padding: 0 16px; background: #21262d; color: #e6edf3; font: inherit; font-size: .85rem; font-weight: 650; cursor: pointer; }}
     .refresh-button:hover, .refresh-button:focus-visible {{ border-color: #58a6ff; outline: none; }}
     .section-nav {{ position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 16px; padding: 10px 16px; background: #0d1117ed; backdrop-filter: blur(12px); scrollbar-width: none; }}
@@ -692,6 +792,7 @@ def render_page(
       <p>Top stories from the U.S., Europe, the Middle East, and Atlanta.</p>
       {source_disclosure}
     </header>
+    {render_weather_alerts(alerts)}
     {render_forecast(forecast)}
     <nav class="section-nav" aria-label="News sections">
       <a href="#us">US</a>
@@ -812,6 +913,11 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
         print(f"Warning: Atlanta forecast unavailable: {exc}", file=sys.stderr)
         forecast = None
+    try:
+        alerts = fetch_atlanta_alerts()
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+        print(f"Warning: Atlanta weather alerts unavailable: {exc}", file=sys.stderr)
+        alerts = None
     output_dir.mkdir(parents=True, exist_ok=True)
     live_news_url = os.environ.get("LIVE_NEWS_URL", "").strip()
     if live_news_url and safe_link(live_news_url) != live_news_url:
@@ -825,6 +931,7 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
             live_news_url,
             [feed["name"] for feed in feeds],
             forecast,
+            alerts,
         ),
         encoding="utf-8",
     )
