@@ -90,6 +90,44 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("anchor.href = link.href", page)
         self.assertNotIn("storyPageByLink", page)
 
+    def test_market_movers_panel_uses_public_tradingview_widget(self):
+        page = render_page(
+            [],
+            self.now,
+        )
+        self.assertIn("mode=\"market-movers\"", page)
+        self.assertIn("exchange=\"US\"", page)
+        self.assertIn("assets-type=\"stocks\"", page)
+        self.assertIn(
+            'src="https://widgets.tradingview-widget.com/w/en/tv-market-overview.js"',
+            page,
+        )
+        self.assertIn("Market data by TradingView", page)
+        self.assertIn(
+            "Data availability and delay vary by exchange. For information only—not investment advice.",
+            page,
+        )
+
+    def test_lower_atlantic_gas_panel_links_to_worker_and_states_coverage(self):
+        page = render_page(
+            [],
+            self.now,
+            "https://morning-news-live.example.workers.dev/latest.json",
+        )
+        self.assertIn(
+            'data-live-url="https://morning-news-live.example.workers.dev/gas.json"',
+            page,
+        )
+        self.assertIn("Weekly gas price · Lower Atlantic", page)
+        self.assertIn("PADD 1C (Lower Atlantic) weekly regular-gasoline retail price", page)
+        self.assertIn("not Atlanta or Georgia-specific", page)
+        self.assertIn("refreshGasPrice()", page)
+
+    def test_gas_panel_explains_api_key_setup_when_worker_is_not_configured(self):
+        page = render_page([], self.now)
+        self.assertIn("Add an EIA API key to the live Worker", page)
+        self.assertIn('data-live-url=""', page)
+
     def test_header_lists_configured_sources_with_brief_copy(self):
         page = render_page(
             [],

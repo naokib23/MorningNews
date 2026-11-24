@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseFeed, selectLatest } from "../src/index.js";
+import worker, {
+  normalizeGasPrice,
+  parseFeed,
+  selectLatest,
+} from "../src/index.js";
 
 const now = Date.parse("2026-11-18T12:00:00Z");
 
@@ -56,4 +60,45 @@ test("sorts latest items and removes duplicate headlines", () => {
     "Same-story!",
     "Another story",
   ]);
+});
+
+test("normalizes the EIA Lower Atlantic weekly regular-gas price", () => {
+  const snapshot = normalizeGasPrice({
+    response: {
+      data: [{
+        duoarea: "R1Z",
+        product: "EPMRU",
+        process: "PTE",
+        period: "2026-11-16",
+        value: "3.406",
+        units: "$/GAL",
+      }],
+    },
+  }, now);
+
+  assert.deepEqual(snapshot, {
+    updated_at: "2026-11-18T12:00:00.000Z",
+    period: "2026-11-16",
+    price: 3.406,
+  });
+  assert.throws(() => normalizeGasPrice({
+    response: { data: [{
+      duoarea: "SGA",
+      product: "EPMRU",
+      process: "PTE",
+      period: "2026-11-16",
+      value: "3.406",
+      units: "$/GAL",
+    }] },
+  }, now), /no usable Lower Atlantic gasoline price/);
+});
+
+test("gas endpoint reports when its EIA key is not configured", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/gas.json"),
+    { ALLOWED_ORIGIN: "https://dashboard.example", LATEST_NEWS: { get: async () => null } }
+  );
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "EIA gas data is not configured." });
 });

@@ -5,6 +5,7 @@ const MAX_ARTICLES_PER_FEED = 20;
 const MAX_TICKER_ITEMS = 30;
 const REQUEST_TIMEOUT_MS = 12_000;
 const SNAPSHOT_KEY = "latest";
+const GAS_PRICE_KEY = "gas-price";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -115,6 +116,28 @@ export function selectLatest(items) {
     .slice(0, MAX_TICKER_ITEMS);
 }
 
+export function normalizeGasPrice(payload, now = Date.now()) {
+  const row = payload?.response?.data?.[0];
+  const price = Number(row?.value);
+  if (
+    !row
+    || row.duoarea !== "R1Z"
+    || row.product !== "EPMRU"
+    || row.process !== "PTE"
+    || !/^\d{4}-\d{2}-\d{2}$/.test(row.period)
+    || !Number.isFinite(price)
+    || price <= 0
+    || row.units !== "$/GAL"
+  ) {
+    throw new Error("EIA response contained no usable Lower Atlantic gasoline price.");
+  }
+  return {
+    updated_at: new Date(now).toISOString(),
+    period: row.period,
+    price,
+  };
+}
+
 async function fetchFeed(feed) {
   const url = new URL(feed.url);
   if (url.protocol !== "https:") throw new Error("Feed URL must use HTTPS.");
@@ -162,6 +185,37 @@ async function updateSnapshot(env) {
   console.log("Published", latest.length, "latest headlines.");
 }
 
+async function updateGasPrice(env) {
+  if (!env.EIA_API_KEY) return;
+  const current = await env.LATEST_NEWS.get(GAS_PRICE_KEY, { type: "json" });
+  if (
+    current
+    && Number.isFinite(Date.parse(current.updated_at))
+    && Date.now() - Date.parse(current.updated_at) < 24 * 60 * 60 * 1000
+  ) return;
+
+  const url = new URL("https://api.eia.gov/v2/petroleum/pri/gnd/data/");
+  url.searchParams.set("api_key", env.EIA_API_KEY);
+  url.searchParams.set("frequency", "weekly");
+  url.searchParams.set("data[]", "value");
+  url.searchParams.set("facets[duoarea][]", "R1Z");
+  url.searchParams.set("facets[product][]", "EPMRU");
+  url.searchParams.set("facets[process][]", "PTE");
+  url.searchParams.set("sort[0][column]", "period");
+  url.searchParams.set("sort[0][direction]", "desc");
+  url.searchParams.set("length", "1");
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error("EIA returned HTTP " + response.status);
+  const snapshot = normalizeGasPrice(await response.json());
+  await env.LATEST_NEWS.put(GAS_PRICE_KEY, JSON.stringify(snapshot), {
+    expirationTtl: 14 * 24 * 60 * 60,
+  });
+  console.log("Published Lower Atlantic weekly gasoline price.");
+}
+
 function jsonResponse(body, status, origin) {
   return Response.json(body, {
     status,
@@ -193,21 +247,35 @@ export default {
       });
     }
     const url = new URL(request.url);
-    if (request.method !== "GET" || url.pathname !== "/latest.json") {
+    if (request.method !== "GET" || !["/latest.json", "/gas.json"].includes(url.pathname)) {
       return jsonResponse({ error: "Not found." }, 404, env.ALLOWED_ORIGIN);
     }
-    const snapshot = await env.LATEST_NEWS.get(SNAPSHOT_KEY, { type: "json" });
+    const isGasPrice = url.pathname === "/gas.json";
+    if (isGasPrice && !env.EIA_API_KEY) {
+      return jsonResponse({ error: "EIA gas data is not configured." }, 503, env.ALLOWED_ORIGIN);
+    }
+    const snapshot = await env.LATEST_NEWS.get(
+      isGasPrice ? GAS_PRICE_KEY : SNAPSHOT_KEY,
+      { type: "json" }
+    );
     if (!snapshot) {
-      return jsonResponse({ error: "The first live snapshot is not ready yet." }, 503, env.ALLOWED_ORIGIN);
+      return jsonResponse({
+        error: isGasPrice
+          ? "The first EIA gas snapshot is not ready yet."
+          : "The first live snapshot is not ready yet.",
+      }, 503, env.ALLOWED_ORIGIN);
     }
     return jsonResponse(snapshot, 200, env.ALLOWED_ORIGIN);
   },
 
   async scheduled(_controller, env, context) {
-    context.waitUntil(
+    context.waitUntil(Promise.all([
       updateSnapshot(env).catch((error) => {
         console.error("Live news refresh failed:", error);
-      })
-    );
+      }),
+      updateGasPrice(env).catch((error) => {
+        console.error("Gas price refresh failed:", error);
+      }),
+    ]));
   },
 };
