@@ -840,8 +840,8 @@ def render_page(
       <p class="gas-price" id="gas-price" data-live-url="{html.escape(gas_price_url, quote=True)}">
         Configure an EIA API key to load this estimate.
       </p>
-      <p class="gas-credit"><a href="https://www.eia.gov/dnav/pet/pet_pri_gnd_dcus_nus_w.htm"
-        target="_blank" rel="noopener noreferrer">U.S. Energy Information Administration</a></p>
+      <p class="gas-credit"><a href="https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&amp;s=EMM_EPMRU_PTE_R1Z_DPG&amp;f=W"
+        target="_blank" rel="noopener noreferrer">EIA Lower Atlantic price series</a></p>
       <p class="gas-disclaimer">PADD 1C (Lower Atlantic) weekly regular-gasoline retail price; this is a multi-state regional estimate, not Atlanta or Georgia-specific.</p>
     </section>
     <section class="market-strip" aria-labelledby="market-title">

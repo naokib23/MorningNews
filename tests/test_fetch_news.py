@@ -119,6 +119,10 @@ class DashboardTests(unittest.TestCase):
             page,
         )
         self.assertIn("Weekly gas price · Lower Atlantic", page)
+        self.assertIn(
+            "https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&amp;s=EMM_EPMRU_PTE_R1Z_DPG&amp;f=W",
+            page,
+        )
         self.assertIn("PADD 1C (Lower Atlantic) weekly regular-gasoline retail price", page)
         self.assertIn("not Atlanta or Georgia-specific", page)
         self.assertIn("refreshGasPrice()", page)
