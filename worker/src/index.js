@@ -4,8 +4,10 @@ const MAX_AGE_MS = 72 * 60 * 60 * 1000;
 const MAX_ARTICLES_PER_FEED = 20;
 const MAX_TICKER_ITEMS = 30;
 const REQUEST_TIMEOUT_MS = 12_000;
+const STOCK_MOVERS_REFRESH_MS = 10 * 60 * 1000;
 const SNAPSHOT_KEY = "latest";
 const GAS_PRICE_KEY = "gas-price";
+const STOCK_MOVERS_KEY = "stock-movers";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -138,6 +140,51 @@ export function normalizeGasPrice(payload, now = Date.now()) {
   };
 }
 
+export function normalizeStockMovers(payload, now = Date.now()) {
+  const quotes = payload?.finance?.result?.[0]?.quotes;
+  if (!Array.isArray(quotes)) {
+    throw new Error("Yahoo Finance response contained no stock movers.");
+  }
+
+  const sourceTimes = [];
+  const items = quotes.flatMap((quote) => {
+    const symbol = typeof quote?.symbol === "string" ? quote.symbol.trim() : "";
+    const name = (typeof quote?.shortName === "string" && quote.shortName.trim())
+      || (typeof quote?.longName === "string" && quote.longName.trim())
+      || "";
+    if (
+      quote?.regularMarketPrice === null
+      || quote?.regularMarketPrice === undefined
+      || quote?.regularMarketChangePercent === null
+      || quote?.regularMarketChangePercent === undefined
+    ) return [];
+    const price = Number(quote?.regularMarketPrice);
+    const changePercent = Number(quote?.regularMarketChangePercent);
+    const sourceTime = Number(quote?.regularMarketTime);
+    if (
+      !/^[A-Z0-9.-]{1,12}$/.test(symbol)
+      || !name
+      || !Number.isFinite(price)
+      || price <= 0
+      || !Number.isFinite(changePercent)
+    ) return [];
+    if (Number.isFinite(sourceTime) && sourceTime > 0) sourceTimes.push(sourceTime);
+    return [{ symbol, name, price, change_percent: changePercent }];
+  }).slice(0, 3);
+
+  if (items.length === 0) {
+    throw new Error("Yahoo Finance response contained no usable stock movers.");
+  }
+  const asOf = sourceTimes.length > 0
+    ? Math.max(...sourceTimes) * 1000
+    : now;
+  return {
+    updated_at: new Date(now).toISOString(),
+    as_of: new Date(asOf).toISOString(),
+    items,
+  };
+}
+
 async function fetchFeed(feed) {
   const url = new URL(feed.url);
   if (url.protocol !== "https:") throw new Error("Feed URL must use HTTPS.");
@@ -216,6 +263,32 @@ async function updateGasPrice(env) {
   console.log("Published Lower Atlantic weekly gasoline price.");
 }
 
+async function updateStockMovers(env) {
+  const current = await env.LATEST_NEWS.get(STOCK_MOVERS_KEY, { type: "json" });
+  if (
+    current
+    && Number.isFinite(Date.parse(current.updated_at))
+    && Date.now() - Date.parse(current.updated_at) < STOCK_MOVERS_REFRESH_MS
+  ) return;
+
+  const url = new URL("https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved");
+  url.searchParams.set("count", "10");
+  url.searchParams.set("scrIds", "day_gainers");
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; MorningNews/1.0; +https://github.com/naokib23/MorningNews)",
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error("Yahoo Finance returned HTTP " + response.status);
+  const snapshot = normalizeStockMovers(await response.json());
+  await env.LATEST_NEWS.put(STOCK_MOVERS_KEY, JSON.stringify(snapshot), {
+    expirationTtl: 24 * 60 * 60,
+  });
+  console.log("Published", snapshot.items.length, "daily stock movers.");
+}
+
 function jsonResponse(body, status, origin) {
   return Response.json(body, {
     status,
@@ -247,22 +320,32 @@ export default {
       });
     }
     const url = new URL(request.url);
-    if (request.method !== "GET" || !["/latest.json", "/gas.json"].includes(url.pathname)) {
+    if (
+      request.method !== "GET"
+      || !["/latest.json", "/gas.json", "/stocks.json"].includes(url.pathname)
+    ) {
       return jsonResponse({ error: "Not found." }, 404, env.ALLOWED_ORIGIN);
     }
     const isGasPrice = url.pathname === "/gas.json";
+    const isStockMovers = url.pathname === "/stocks.json";
     if (isGasPrice && !env.EIA_API_KEY) {
       return jsonResponse({ error: "EIA gas data is not configured." }, 503, env.ALLOWED_ORIGIN);
     }
     const snapshot = await env.LATEST_NEWS.get(
-      isGasPrice ? GAS_PRICE_KEY : SNAPSHOT_KEY,
+      isGasPrice
+        ? GAS_PRICE_KEY
+        : isStockMovers
+          ? STOCK_MOVERS_KEY
+          : SNAPSHOT_KEY,
       { type: "json" }
     );
     if (!snapshot) {
       return jsonResponse({
         error: isGasPrice
           ? "The first EIA gas snapshot is not ready yet."
-          : "The first live snapshot is not ready yet.",
+          : isStockMovers
+            ? "The first stock-movers snapshot is not ready yet."
+            : "The first live snapshot is not ready yet.",
       }, 503, env.ALLOWED_ORIGIN);
     }
     return jsonResponse(snapshot, 200, env.ALLOWED_ORIGIN);
@@ -275,6 +358,9 @@ export default {
       }),
       updateGasPrice(env).catch((error) => {
         console.error("Gas price refresh failed:", error);
+      }),
+      updateStockMovers(env).catch((error) => {
+        console.error("Stock movers refresh failed:", error);
       }),
     ]));
   },

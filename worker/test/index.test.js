@@ -3,6 +3,7 @@ import test from "node:test";
 
 import worker, {
   normalizeGasPrice,
+  normalizeStockMovers,
   parseFeed,
   selectLatest,
 } from "../src/index.js";
@@ -101,4 +102,95 @@ test("gas endpoint reports when its EIA key is not configured", async () => {
 
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), { error: "EIA gas data is not configured." });
+});
+
+test("normalizes the top three Yahoo Finance daily gainers", () => {
+  const marketTime = Math.floor(now / 1000);
+  const snapshot = normalizeStockMovers({
+    finance: {
+      result: [{
+        quotes: [
+          {
+            symbol: "BAD",
+            shortName: "Incomplete quote",
+            regularMarketPrice: null,
+            regularMarketChangePercent: 99,
+          },
+          {
+            symbol: "NVDA",
+            shortName: "NVIDIA Corporation",
+            regularMarketPrice: 165.05,
+            regularMarketChangePercent: 31.4825,
+            regularMarketTime: marketTime,
+          },
+          {
+            symbol: "KYMR",
+            shortName: "Kymera Therapeutics, Inc.",
+            regularMarketPrice: 150.37,
+            regularMarketChangePercent: 30.405,
+            regularMarketTime: marketTime,
+          },
+          {
+            symbol: "AXTI",
+            shortName: "AXT Inc",
+            regularMarketPrice: 38.02,
+            regularMarketChangePercent: 24.3703,
+            regularMarketTime: marketTime,
+          },
+          {
+            symbol: "IREN",
+            shortName: "IREN Limited",
+            regularMarketPrice: 14.64,
+            regularMarketChangePercent: 23.8579,
+            regularMarketTime: marketTime,
+          },
+        ],
+      }],
+    },
+  }, now);
+
+  assert.deepEqual(snapshot, {
+    updated_at: "2026-11-18T12:00:00.000Z",
+    as_of: "2026-11-18T12:00:00.000Z",
+    items: [
+      {
+        symbol: "NVDA",
+        name: "NVIDIA Corporation",
+        price: 165.05,
+        change_percent: 31.4825,
+      },
+      {
+        symbol: "KYMR",
+        name: "Kymera Therapeutics, Inc.",
+        price: 150.37,
+        change_percent: 30.405,
+      },
+      {
+        symbol: "AXTI",
+        name: "AXT Inc",
+        price: 38.02,
+        change_percent: 24.3703,
+      },
+    ],
+  });
+});
+
+test("stocks endpoint returns the cached daily movers", async () => {
+  const snapshot = {
+    updated_at: "2026-11-18T12:00:00.000Z",
+    as_of: "2026-11-18T12:00:00.000Z",
+    items: [{ symbol: "NVDA", name: "NVIDIA Corporation", price: 165.05, change_percent: 31.4825 }],
+  };
+  const response = await worker.fetch(
+    new Request("https://worker.example/stocks.json"),
+    {
+      ALLOWED_ORIGIN: "https://dashboard.example",
+      LATEST_NEWS: {
+        get: async (key) => key === "stock-movers" ? snapshot : null,
+      },
+    }
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), snapshot);
 });

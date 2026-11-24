@@ -25,7 +25,7 @@ Without these Cloudflare settings, the ticker continues to show the latest sched
 
 ## Market movers and gas-price API
 
-The Market movers panel uses TradingView's official U.S. stock market-movers widget. It requires no API key; market-data availability and delay vary by exchange. TradingView provides its own branding and links, and the panel is informational rather than investment advice. The widget loads directly from TradingView, so it needs an internet connection and may not appear if third-party content is blocked.
+The Today's top stock movers card shows the top three U.S. daily gainers from Yahoo Finance's public screener. The live Worker caches the results and refreshes them about every 10 minutes; no API key is required. Quotes may be delayed and the public endpoint can change or become unavailable. The **Full market details** link opens TradingView's market-movers page for charts and the longer list. This information is for reference only, not investment advice.
 
 The gas-price section is currently hidden from the dashboard. The live Worker still supports `/gas.json`, using EIA's weekly regular-gasoline retail price for PADD 1C (Lower Atlantic), a multi-state region that includes Georgia but is not Atlanta- or Georgia-specific. The EIA dataset does not publish a Georgia statewide price. To enable the endpoint, obtain a free EIA API key and add it as the `EIA_API_KEY` Worker secret under **Workers & Pages → morning-news-live → Settings → Variables and Secrets**. The Worker checks EIA at most once per day; the source itself updates weekly.
 

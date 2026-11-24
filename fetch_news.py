@@ -686,6 +686,16 @@ def render_page(
     timestamp = updated.strftime("%b %d, %Y at %H:%M UTC")
     ticker_status = "Connecting to live headlines…" if live_news_url else f"Scheduled snapshot · {timestamp}"
     ticker = render_ticker(ranked_stories)
+    stock_movers_url = (
+        live_news_url.rsplit("/latest.json", 1)[0] + "/stocks.json"
+        if live_news_url.endswith("/latest.json")
+        else ""
+    )
+    stock_movers_status = (
+        "Loading today’s movers…"
+        if stock_movers_url
+        else "Live stock data is not connected."
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -746,12 +756,22 @@ def render_page(
     .market-strip {{ margin: 0 0 18px; border: 1px solid #30363d; border-radius: 12px; padding: 12px; background: #161b22; }}
     .market-heading {{ display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 10px; }}
     .market-heading h2 {{ margin: 0; font-size: 1rem; }}
-    .market-widget {{ height: 300px; overflow: hidden; border: 1px solid #30363d; border-radius: 9px; background: #0d1117; }}
-    .market-widget tv-market-overview {{ display: block; height: 100%; min-height: 0; width: 100%; }}
-    .market-attribution, .market-disclaimer {{ color: #8b949e; font-size: .7rem; }}
-    .market-attribution {{ margin: 8px 2px 0; }}
-    .market-attribution a {{ color: #8b949e; }}
-    .market-disclaimer {{ margin: 6px 2px 0; line-height: 1.45; }}
+    .market-status, .market-credit, .market-disclaimer {{ color: #8b949e; font-size: .7rem; }}
+    .market-list {{ display: grid; border-top: 1px solid #30363d; }}
+    .market-row {{ display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; border-bottom: 1px solid #30363d; padding: 9px 2px; }}
+    .market-identity {{ display: flex; min-width: 0; align-items: baseline; gap: 8px; }}
+    .market-symbol {{ flex: 0 0 auto; color: #e6edf3; font-size: .82rem; font-weight: 750; }}
+    .market-name {{ overflow: hidden; color: #8b949e; font-size: .74rem; text-overflow: ellipsis; white-space: nowrap; }}
+    .market-quote {{ display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }}
+    .market-price {{ color: #c9d1d9; font-size: .74rem; }}
+    .market-change {{ font-size: .74rem; font-weight: 700; }}
+    .market-change--up {{ color: #3fb950; }}
+    .market-change--down {{ color: #f85149; }}
+    .market-footer {{ display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }}
+    .market-details-button {{ display: inline-flex; min-height: 36px; align-items: center; border: 1px solid #30363d; border-radius: 999px; padding: 0 12px; background: #21262d; color: #58a6ff; font-size: .75rem; font-weight: 650; text-decoration: none; }}
+    .market-details-button:hover, .market-details-button:focus-visible {{ border-color: #58a6ff; outline: none; }}
+    .market-credit, .market-disclaimer {{ margin: 6px 2px 0; line-height: 1.4; }}
+    .market-credit a {{ color: #8b949e; }}
     .refresh-button {{ flex: 0 0 auto; min-height: 44px; border: 1px solid #30363d; border-radius: 999px; padding: 0 16px; background: #21262d; color: #e6edf3; font: inherit; font-size: .85rem; font-weight: 650; cursor: pointer; }}
     .refresh-button:hover, .refresh-button:focus-visible {{ border-color: #58a6ff; outline: none; }}
     .section-nav {{ position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 16px; padding: 10px 16px; background: #0d1117ed; backdrop-filter: blur(12px); scrollbar-width: none; }}
@@ -796,6 +816,7 @@ def render_page(
     @media (max-width: 700px) {{
       main {{ max-width: 760px; }}
       .forecast-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(88px, 1fr); grid-template-columns: none; overflow-x: auto; padding-bottom: 4px; scrollbar-color: #30363d transparent; }}
+      .market-heading {{ align-items: flex-start; flex-direction: column; gap: 4px; }}
       .regional-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(84vw, 1fr); grid-template-columns: none; overflow-x: auto; margin: 0 -16px 22px; padding: 0 16px 10px; scroll-snap-type: x mandatory; scrollbar-color: #30363d transparent; }}
       .regional-grid .news-section {{ scroll-snap-align: start; }}
     }}
@@ -815,18 +836,21 @@ def render_page(
     {render_forecast(forecast)}
     <section class="market-strip" aria-labelledby="market-title">
       <div class="market-heading">
-        <h2 id="market-title">Market movers</h2>
+        <h2 id="market-title">Today’s top stock movers</h2>
+        <span class="market-status" id="market-status" aria-live="polite">{html.escape(stock_movers_status)}</span>
       </div>
-      <div class="market-widget">
-        <tv-market-overview mode="market-movers" exchange="US" symbol-sectors="[]"
-          time-frame="12M" item-size="compact" assets-type="stocks" chart-size="compact"
-          theme="dark">
-          <p class="market-disclaimer">Loading U.S. stock movers…</p>
-        </tv-market-overview>
+      <div class="market-list" id="market-movers" data-live-url="{html.escape(stock_movers_url, quote=True)}"
+        aria-live="polite">
+        <p class="market-disclaimer">{html.escape(stock_movers_status)}</p>
       </div>
-      <p class="market-attribution"><a href="https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/"
-        target="_blank" rel="noopener noreferrer">Market data by TradingView</a></p>
-      <p class="market-disclaimer">Data availability and delay vary by exchange. For information only—not investment advice.</p>
+      <div class="market-footer">
+        <a class="market-details-button" href="https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/"
+          target="_blank" rel="noopener noreferrer">Full market details</a>
+        <span class="market-status" id="market-updated"></span>
+      </div>
+      <p class="market-credit">Market data from <a href="https://finance.yahoo.com/markets/stocks/gainers/"
+        target="_blank" rel="noopener noreferrer">Yahoo Finance</a>; quotes may be delayed.</p>
+      <p class="market-disclaimer">Market information only—not investment advice.</p>
     </section>
     <nav class="section-nav" aria-label="News sections">
       <a href="#us">US</a>
@@ -846,7 +870,6 @@ def render_page(
     {content}
     <footer>Updated {html.escape(timestamp)} · Summaries come from RSS/Atom feeds; region labels are inferred from headlines.</footer>
   </main>
-  <script type="module" src="https://widgets.tradingview-widget.com/w/en/tv-market-overview.js"></script>
   <script>
     document.getElementById("refresh-dashboard").addEventListener("click", () => {{
       const url = new URL(window.location.href);
@@ -910,6 +933,71 @@ def render_page(
       }}
       refreshLatestHeadlines();
       window.setInterval(refreshLatestHeadlines, 60_000);
+    }}
+
+    const marketMovers = document.getElementById("market-movers");
+    const marketStatus = document.getElementById("market-status");
+    const marketUpdated = document.getElementById("market-updated");
+    const stockMoversUrl = marketMovers.dataset.liveUrl;
+    if (stockMoversUrl) {{
+      let isRefreshingMarket = false;
+      async function refreshMarketMovers() {{
+        if (isRefreshingMarket) return;
+        isRefreshingMarket = true;
+        try {{
+          const response = await fetch(stockMoversUrl, {{ cache: "no-store" }});
+          if (!response.ok) throw new Error("Stock movers request failed.");
+          const snapshot = await response.json();
+          if (!Array.isArray(snapshot.items)) throw new Error("Invalid stock movers response.");
+          const fragment = document.createDocumentFragment();
+          for (const item of snapshot.items.slice(0, 3)) {{
+            if (!item || typeof item.symbol !== "string" || typeof item.name !== "string"
+              || !Number.isFinite(item.price) || !Number.isFinite(item.change_percent)) continue;
+            const row = document.createElement("div");
+            row.className = "market-row";
+            const identity = document.createElement("div");
+            identity.className = "market-identity";
+            const symbol = document.createElement("strong");
+            symbol.className = "market-symbol";
+            symbol.textContent = item.symbol;
+            const name = document.createElement("span");
+            name.className = "market-name";
+            name.textContent = item.name;
+            identity.append(symbol, name);
+            const quote = document.createElement("div");
+            quote.className = "market-quote";
+            const price = document.createElement("span");
+            price.className = "market-price";
+            price.textContent = "$" + item.price.toFixed(2);
+            const change = document.createElement("strong");
+            change.className = "market-change " + (item.change_percent >= 0
+              ? "market-change--up"
+              : "market-change--down");
+            change.textContent = (item.change_percent >= 0 ? "+" : "")
+              + item.change_percent.toFixed(2) + "%";
+            quote.append(price, change);
+            row.append(identity, quote);
+            fragment.append(row);
+          }}
+          if (!fragment.childNodes.length) throw new Error("No usable stock movers.");
+          marketMovers.replaceChildren(fragment);
+          marketStatus.textContent = "Top daily gainers";
+          const asOf = new Date(snapshot.as_of || snapshot.updated_at);
+          marketUpdated.textContent = Number.isNaN(asOf.getTime())
+            ? ""
+            : "As of " + asOf.toLocaleString([], {{
+              month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+            }});
+        }} catch {{
+          marketMovers.replaceChildren();
+          marketStatus.textContent = "Live market data unavailable.";
+          marketUpdated.textContent = "";
+        }} finally {{
+          isRefreshingMarket = false;
+        }}
+      }}
+      refreshMarketMovers();
+      window.setInterval(refreshMarketMovers, 10 * 60_000);
     }}
 
   </script>

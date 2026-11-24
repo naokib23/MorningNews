@@ -90,27 +90,23 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("anchor.href = link.href", page)
         self.assertNotIn("storyPageByLink", page)
 
-    def test_market_movers_panel_uses_public_tradingview_widget(self):
+    def test_market_movers_show_a_short_list_with_a_details_link(self):
         page = render_page(
             [],
             self.now,
+            "https://morning-news-live.example.workers.dev/latest.json",
         )
-        self.assertIn("mode=\"market-movers\"", page)
-        self.assertIn("exchange=\"US\"", page)
-        self.assertIn("assets-type=\"stocks\"", page)
-        self.assertIn("item-size=\"compact\"", page)
-        self.assertIn("chart-size=\"compact\"", page)
-        self.assertIn(".market-widget { height: 300px; overflow: hidden;", page)
-        self.assertIn(".market-widget tv-market-overview { display: block; height: 100%;", page)
         self.assertIn(
-            'src="https://widgets.tradingview-widget.com/w/en/tv-market-overview.js"',
+            'data-live-url="https://morning-news-live.example.workers.dev/stocks.json"',
             page,
         )
-        self.assertIn("Market data by TradingView", page)
-        self.assertIn(
-            "Data availability and delay vary by exchange. For information only—not investment advice.",
-            page,
-        )
+        self.assertIn("Today’s top stock movers", page)
+        self.assertIn('href="https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/"', page)
+        self.assertIn("Market data from", page)
+        self.assertIn("Yahoo Finance", page)
+        self.assertIn("refreshMarketMovers()", page)
+        self.assertIn("snapshot.items.slice(0, 3)", page)
+        self.assertNotIn("tv-market-overview", page)
 
     def test_weather_and_market_panels_are_full_width_and_stacked_above_news(self):
         page = render_page([], self.now, alerts=[])
