@@ -822,6 +822,7 @@ def render_page(
       .forecast-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(88px, 1fr); grid-template-columns: none; overflow-x: auto; padding-bottom: 4px; scrollbar-color: #30363d transparent; }}
       .market-widget, .market-widget tv-market-overview {{ min-height: 410px; }}
       .utility-summary-grid {{ grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); }}
+      .gas-heading {{ align-items: flex-start; flex-direction: column; gap: 4px; }}
       .regional-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(84vw, 1fr); grid-template-columns: none; overflow-x: auto; margin: 0 -16px 22px; padding: 0 16px 10px; scroll-snap-type: x mandatory; scrollbar-color: #30363d transparent; }}
       .regional-grid .news-section {{ scroll-snap-align: start; }}
     }}
