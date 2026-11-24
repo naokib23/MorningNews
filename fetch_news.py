@@ -15,7 +15,7 @@ import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from html.parser import HTMLParser
 from pathlib import Path
@@ -382,6 +382,14 @@ def fetch_atlanta_forecast(timeout: int = 8) -> list[dict]:
     ):
         raise ValueError("Weather service returned an invalid 7-day forecast.")
 
+    utc_offset = payload.get("utc_offset_seconds", -18_000)
+    try:
+        utc_offset = int(utc_offset)
+    except (TypeError, ValueError):
+        utc_offset = -18_000
+    atlanta_today = (
+        datetime.now(timezone.utc) + timedelta(seconds=utc_offset)
+    ).date()
     forecast = []
     for day, code, high, low, precipitation in zip(*(daily[key] for key in fields)):
         try:
@@ -404,15 +412,17 @@ def fetch_atlanta_forecast(timeout: int = 8) -> list[dict]:
         ):
             raise ValueError("Weather service returned out-of-range forecast values.")
         condition, icon = WEATHER_CODES.get(code, ("Conditions unavailable", "•"))
+        date_label = f"{parsed_day.strftime('%a, %b')} {parsed_day.day}"
+        if parsed_day.date() == atlanta_today:
+            date_label = f"Today · {date_label}"
         forecast.append({
-            "date": f"{parsed_day.strftime('%a, %b')} {parsed_day.day}",
+            "date": date_label,
             "condition": condition,
             "icon": icon,
             "high": round(high),
             "low": round(low),
             "precipitation": precipitation,
         })
-    forecast[0]["date"] = "Today"
     return forecast
 
 

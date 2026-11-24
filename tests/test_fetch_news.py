@@ -176,8 +176,8 @@ class DashboardTests(unittest.TestCase):
         response.read.return_value = json.dumps({
             "daily": {
                 "time": [
-                    "2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26",
-                    "2026-11-27", "2026-11-28", "2026-11-29",
+                    "2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27",
+                    "2026-11-28", "2026-11-29", "2026-11-30",
                 ],
                 "weather_code": [3, 51, 53, 51, 3, 3, 3],
                 "temperature_2m_max": [66.5, 59, 49.6, 61.1, 54, 63.5, 67.2],
@@ -189,8 +189,9 @@ class DashboardTests(unittest.TestCase):
             forecast = fetch_atlanta_forecast()
 
         self.assertEqual(len(forecast), 7)
-        self.assertEqual(forecast[0]["date"], "Today")
-        self.assertEqual(forecast[1]["date"], "Tue, Nov 24")
+        self.assertIn("Today", forecast[0]["date"])
+        self.assertIn("Nov 24", forecast[0]["date"])
+        self.assertEqual(forecast[1]["date"], "Wed, Nov 25")
         self.assertEqual(forecast[0]["condition"], "Cloudy")
         self.assertEqual(forecast[0]["high"], 66)
         self.assertEqual(forecast[0]["low"], 52)
