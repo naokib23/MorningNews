@@ -108,21 +108,20 @@ class DashboardTests(unittest.TestCase):
             page,
         )
 
-    def test_weather_and_market_panels_live_in_a_drawer_without_moving_news_columns(self):
+    def test_weather_and_market_panels_are_visible_above_unchanged_news_columns(self):
         page = render_page([], self.now, alerts=[])
-        drawer_start = page.index('<dialog class="utility-drawer"')
-        drawer_end = page.index("</dialog>", drawer_start)
-        drawer = page[drawer_start:drawer_end]
+        utility_start = page.index('<div class="utility-panel-grid">')
+        news_nav_start = page.index('<nav class="section-nav"')
 
-        self.assertIn('id="open-utility-drawer"', page)
-        self.assertIn("aria-haspopup=\"dialog\"", page)
-        self.assertIn('id="close-utility-drawer"', drawer)
-        self.assertIn('class="forecast"', drawer)
-        self.assertIn('class="gas-strip"', drawer)
-        self.assertIn('class="market-strip"', drawer)
-        self.assertIn("utilityDrawer.showModal()", page)
-        self.assertIn("if (event.target === utilityDrawer) utilityDrawer.close()", page)
-        self.assertLess(page.index('class="weather-alerts"'), drawer_start)
+        self.assertNotIn("<dialog", page)
+        self.assertNotIn("open-utility-drawer", page)
+        self.assertIn('class="forecast"', page[utility_start:news_nav_start])
+        self.assertIn('class="gas-strip"', page[utility_start:news_nav_start])
+        self.assertIn('class="market-strip"', page[utility_start:news_nav_start])
+        self.assertLess(page.index('class="weather-alerts"'), utility_start)
+        self.assertLess(utility_start, news_nav_start)
+        self.assertIn("utility-summary-grid", page)
+        self.assertIn("utility-panel-grid", page)
         self.assertIn('class="regional-grid"', page)
         self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", page)
 
