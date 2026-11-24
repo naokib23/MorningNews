@@ -108,6 +108,24 @@ class DashboardTests(unittest.TestCase):
             page,
         )
 
+    def test_weather_and_market_panels_live_in_a_drawer_without_moving_news_columns(self):
+        page = render_page([], self.now, alerts=[])
+        drawer_start = page.index('<dialog class="utility-drawer"')
+        drawer_end = page.index("</dialog>", drawer_start)
+        drawer = page[drawer_start:drawer_end]
+
+        self.assertIn('id="open-utility-drawer"', page)
+        self.assertIn("aria-haspopup=\"dialog\"", page)
+        self.assertIn('id="close-utility-drawer"', drawer)
+        self.assertIn('class="forecast"', drawer)
+        self.assertIn('class="gas-strip"', drawer)
+        self.assertIn('class="market-strip"', drawer)
+        self.assertIn("utilityDrawer.showModal()", page)
+        self.assertIn("if (event.target === utilityDrawer) utilityDrawer.close()", page)
+        self.assertLess(page.index('class="weather-alerts"'), drawer_start)
+        self.assertIn('class="regional-grid"', page)
+        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", page)
+
     def test_lower_atlantic_gas_panel_links_to_worker_and_states_coverage(self):
         page = render_page(
             [],

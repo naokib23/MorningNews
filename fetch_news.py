@@ -714,6 +714,7 @@ def render_page(
     main {{ max-width: 1200px; margin: 0 auto; }}
     header {{ padding: 18px 4px 14px; }}
     .header-row {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; }}
+    .header-actions {{ display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }}
     h1 {{ margin: 0; font-size: clamp(1.8rem, 8vw, 2.5rem); letter-spacing: -.045em; }}
     header p {{ margin: 8px 0 0; color: #8b949e; font-size: .92rem; line-height: 1.5; }}
     .feed-sources {{ margin-top: 10px; }}
@@ -770,8 +771,14 @@ def render_page(
     .market-attribution {{ margin: 8px 2px 0; }}
     .market-attribution a {{ color: #8b949e; }}
     .market-disclaimer {{ margin: 6px 2px 0; line-height: 1.45; }}
-    .refresh-button {{ flex: 0 0 auto; min-height: 44px; border: 1px solid #30363d; border-radius: 999px; padding: 0 16px; background: #21262d; color: #e6edf3; font: inherit; font-size: .85rem; font-weight: 650; cursor: pointer; }}
-    .refresh-button:hover, .refresh-button:focus-visible {{ border-color: #58a6ff; outline: none; }}
+    .refresh-button, .utility-button {{ flex: 0 0 auto; min-height: 44px; border: 1px solid #30363d; border-radius: 999px; padding: 0 14px; background: #21262d; color: #e6edf3; font: inherit; font-size: .82rem; font-weight: 650; cursor: pointer; }}
+    .refresh-button:hover, .refresh-button:focus-visible, .utility-button:hover, .utility-button:focus-visible {{ border-color: #58a6ff; outline: none; }}
+    .utility-drawer {{ position: fixed; inset: 0 0 0 auto; width: min(440px, 100%); max-width: none; height: 100vh; height: 100dvh; max-height: 100vh; max-height: 100dvh; margin: 0; border: 1px solid #30363d; border-radius: 14px 0 0 14px; padding: 14px; overflow-y: auto; background: #0d1117; color: #e6edf3; }}
+    .utility-drawer::backdrop {{ background: #010409b3; backdrop-filter: blur(2px); }}
+    .utility-drawer-heading {{ position: sticky; top: -14px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -14px -14px 14px; border-bottom: 1px solid #30363d; padding: 14px; background: #0d1117; }}
+    .utility-drawer-heading h2 {{ margin: 0; font-size: 1.05rem; }}
+    .drawer-close {{ min-height: 40px; border: 1px solid #30363d; border-radius: 999px; padding: 0 13px; background: #21262d; color: #e6edf3; font: inherit; font-size: .8rem; font-weight: 650; cursor: pointer; }}
+    .drawer-close:hover, .drawer-close:focus-visible {{ border-color: #58a6ff; outline: none; }}
     .section-nav {{ position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 16px; padding: 10px 16px; background: #0d1117ed; backdrop-filter: blur(12px); scrollbar-width: none; }}
     .section-nav a {{ flex: 0 0 auto; border: 1px solid #30363d; border-radius: 999px; padding: 8px 12px; background: #161b22; color: #e6edf3; font-size: .8rem; font-weight: 650; text-decoration: none; }}
     .section-nav a:hover, .section-nav a:focus-visible {{ border-color: #58a6ff; outline: none; }}
@@ -817,6 +824,11 @@ def render_page(
       .market-widget, .market-widget tv-market-overview {{ min-height: 410px; }}
       .regional-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(84vw, 1fr); grid-template-columns: none; overflow-x: auto; margin: 0 -16px 22px; padding: 0 16px 10px; scroll-snap-type: x mandatory; scrollbar-color: #30363d transparent; }}
       .regional-grid .news-section {{ scroll-snap-align: start; }}
+      .utility-drawer {{ width: min(440px, 100%); border-radius: 0; }}
+    }}
+    @media (max-width: 360px) {{
+      .header-row {{ flex-wrap: wrap; }}
+      .header-actions {{ margin-left: auto; }}
     }}
   </style>
 </head>
@@ -825,40 +837,50 @@ def render_page(
     <header>
       <div class="header-row">
         <h1>Top News</h1>
-        <button class="refresh-button" id="refresh-dashboard" type="button" aria-label="Refresh dashboard">Refresh</button>
+        <div class="header-actions">
+          <button class="utility-button" id="open-utility-drawer" type="button"
+            aria-haspopup="dialog" aria-controls="utility-drawer">Tools</button>
+          <button class="refresh-button" id="refresh-dashboard" type="button" aria-label="Refresh dashboard">Refresh</button>
+        </div>
       </div>
       <p>Top stories from the U.S., Europe, the Middle East, and Atlanta.</p>
       {source_disclosure}
     </header>
     {render_weather_alerts(alerts)}
-    {render_forecast(forecast)}
-    <section class="gas-strip" aria-labelledby="gas-title">
-      <div class="gas-heading">
-        <h2 id="gas-title">Weekly gas price · Lower Atlantic</h2>
-        <span class="gas-status" id="gas-status" aria-live="polite">{html.escape(gas_status)}</span>
+    <dialog class="utility-drawer" id="utility-drawer" aria-labelledby="utility-title">
+      <div class="utility-drawer-heading">
+        <h2 id="utility-title">Weather &amp; markets</h2>
+        <button class="drawer-close" id="close-utility-drawer" type="button">Close</button>
       </div>
-      <p class="gas-price" id="gas-price" data-live-url="{html.escape(gas_price_url, quote=True)}">
-        Configure an EIA API key to load this estimate.
-      </p>
-      <p class="gas-credit"><a href="https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&amp;s=EMM_EPMRU_PTE_R1Z_DPG&amp;f=W"
-        target="_blank" rel="noopener noreferrer">EIA Lower Atlantic price series</a></p>
-      <p class="gas-disclaimer">PADD 1C (Lower Atlantic) weekly regular-gasoline retail price; this is a multi-state regional estimate, not Atlanta or Georgia-specific.</p>
-    </section>
-    <section class="market-strip" aria-labelledby="market-title">
-      <div class="market-heading">
-        <h2 id="market-title">Market movers</h2>
-      </div>
-      <div class="market-widget">
-        <tv-market-overview mode="market-movers" exchange="US" symbol-sectors="[]"
-          time-frame="12M" item-size="normal" assets-type="stocks" chart-size="normal"
-          theme="dark">
-          <p class="market-disclaimer">Loading U.S. stock movers…</p>
-        </tv-market-overview>
-      </div>
-      <p class="market-attribution"><a href="https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/"
-        target="_blank" rel="noopener noreferrer">Market data by TradingView</a></p>
-      <p class="market-disclaimer">Data availability and delay vary by exchange. For information only—not investment advice.</p>
-    </section>
+      {render_forecast(forecast)}
+      <section class="gas-strip" aria-labelledby="gas-title">
+        <div class="gas-heading">
+          <h2 id="gas-title">Weekly gas price · Lower Atlantic</h2>
+          <span class="gas-status" id="gas-status" aria-live="polite">{html.escape(gas_status)}</span>
+        </div>
+        <p class="gas-price" id="gas-price" data-live-url="{html.escape(gas_price_url, quote=True)}">
+          Configure an EIA API key to load this estimate.
+        </p>
+        <p class="gas-credit"><a href="https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&amp;s=EMM_EPMRU_PTE_R1Z_DPG&amp;f=W"
+          target="_blank" rel="noopener noreferrer">EIA Lower Atlantic price series</a></p>
+        <p class="gas-disclaimer">PADD 1C (Lower Atlantic) weekly regular-gasoline retail price; this is a multi-state regional estimate, not Atlanta or Georgia-specific.</p>
+      </section>
+      <section class="market-strip" aria-labelledby="market-title">
+        <div class="market-heading">
+          <h2 id="market-title">Market movers</h2>
+        </div>
+        <div class="market-widget">
+          <tv-market-overview mode="market-movers" exchange="US" symbol-sectors="[]"
+            time-frame="12M" item-size="normal" assets-type="stocks" chart-size="normal"
+            theme="dark">
+            <p class="market-disclaimer">Loading U.S. stock movers…</p>
+          </tv-market-overview>
+        </div>
+        <p class="market-attribution"><a href="https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/"
+          target="_blank" rel="noopener noreferrer">Market data by TradingView</a></p>
+        <p class="market-disclaimer">Data availability and delay vary by exchange. For information only—not investment advice.</p>
+      </section>
+    </dialog>
     <nav class="section-nav" aria-label="News sections">
       <a href="#us">US</a>
       <a href="#europe">Europe</a>
@@ -879,6 +901,13 @@ def render_page(
   </main>
   <script type="module" src="https://widgets.tradingview-widget.com/w/en/tv-market-overview.js"></script>
   <script>
+    const utilityDrawer = document.getElementById("utility-drawer");
+    document.getElementById("open-utility-drawer").addEventListener("click", () => utilityDrawer.showModal());
+    document.getElementById("close-utility-drawer").addEventListener("click", () => utilityDrawer.close());
+    utilityDrawer.addEventListener("click", event => {{
+      if (event.target === utilityDrawer) utilityDrawer.close();
+    }});
+
     document.getElementById("refresh-dashboard").addEventListener("click", () => {{
       const url = new URL(window.location.href);
       url.searchParams.set("refresh", Date.now());
