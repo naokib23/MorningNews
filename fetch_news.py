@@ -8,6 +8,7 @@ import calendar
 import concurrent.futures
 import html
 import json
+import math
 import os
 import re
 import sys
@@ -32,6 +33,42 @@ MAX_ARTICLES_PER_FEED = 25
 MAX_AGE_HOURS = 72
 MAX_SUMMARY_CHARS = 220
 MAX_VISIBLE_PER_SECTION = 10
+ATLANTA_FORECAST_URL = (
+    "https://api.open-meteo.com/v1/forecast"
+    "?latitude=33.749&longitude=-84.388"
+    "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+    "&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=7"
+)
+WEATHER_CODES = {
+    0: ("Clear", "☀️"),
+    1: ("Mostly clear", "🌤️"),
+    2: ("Partly cloudy", "⛅"),
+    3: ("Cloudy", "☁️"),
+    45: ("Fog", "🌫️"),
+    48: ("Icy fog", "🌫️"),
+    51: ("Light drizzle", "🌦️"),
+    53: ("Drizzle", "🌦️"),
+    55: ("Heavy drizzle", "🌧️"),
+    56: ("Freezing drizzle", "🌧️"),
+    57: ("Freezing drizzle", "🌧️"),
+    61: ("Light rain", "🌧️"),
+    63: ("Rain", "🌧️"),
+    65: ("Heavy rain", "🌧️"),
+    66: ("Freezing rain", "🌧️"),
+    67: ("Freezing rain", "🌧️"),
+    71: ("Light snow", "🌨️"),
+    73: ("Snow", "🌨️"),
+    75: ("Heavy snow", "🌨️"),
+    77: ("Snow grains", "🌨️"),
+    80: ("Rain showers", "🌦️"),
+    81: ("Rain showers", "🌧️"),
+    82: ("Heavy showers", "🌧️"),
+    85: ("Snow showers", "🌨️"),
+    86: ("Heavy snow showers", "🌨️"),
+    95: ("Thunderstorm", "⛈️"),
+    96: ("Thunderstorm, hail", "⛈️"),
+    99: ("Thunderstorm, hail", "⛈️"),
+}
 
 
 @dataclass
@@ -320,6 +357,62 @@ def group_sections(ranked_stories: list[tuple[Story, str]]) -> tuple[dict[str, l
     return sections, atlanta_stories
 
 
+def fetch_atlanta_forecast(timeout: int = 8) -> list[dict]:
+    request = urllib.request.Request(
+        ATLANTA_FORECAST_URL,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        payload = json.loads(response.read())
+
+    daily = payload.get("daily") if isinstance(payload, dict) else None
+    fields = (
+        "time",
+        "weather_code",
+        "temperature_2m_max",
+        "temperature_2m_min",
+        "precipitation_probability_max",
+    )
+    if not isinstance(daily, dict) or any(
+        not isinstance(daily.get(key), list) or len(daily[key]) != 7
+        for key in fields
+    ):
+        raise ValueError("Weather service returned an invalid 7-day forecast.")
+
+    forecast = []
+    for day, code, high, low, precipitation in zip(*(daily[key] for key in fields)):
+        try:
+            parsed_day = datetime.strptime(day, "%Y-%m-%d")
+            code = int(code)
+            high = float(high)
+            low = float(low)
+            precipitation = (
+                int(precipitation) if precipitation is not None else None
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Weather service returned invalid forecast values.") from exc
+        if (
+            not math.isfinite(high)
+            or not math.isfinite(low)
+            or (
+                precipitation is not None
+                and not 0 <= precipitation <= 100
+            )
+        ):
+            raise ValueError("Weather service returned out-of-range forecast values.")
+        condition, icon = WEATHER_CODES.get(code, ("Conditions unavailable", "•"))
+        forecast.append({
+            "date": f"{parsed_day.strftime('%a, %b')} {parsed_day.day}",
+            "condition": condition,
+            "icon": icon,
+            "high": round(high),
+            "low": round(low),
+            "precipitation": precipitation,
+        })
+    forecast[0]["date"] = "Today"
+    return forecast
+
+
 def render_card(story: Story) -> str:
     article = story.latest
     title = html.escape(article.title)
@@ -418,11 +511,55 @@ def render_ticker(ranked_stories: list[tuple[Story, str]]) -> str:
     return "\n".join(items)
 
 
+def render_forecast(forecast: list[dict] | None) -> str:
+    if forecast is None:
+        return (
+            '<section class="forecast" aria-labelledby="forecast-title">'
+            '<h2 id="forecast-title">Atlanta 7-day forecast</h2>'
+            '<p class="forecast-unavailable">Forecast unavailable right now.</p>'
+            '<a class="forecast-credit" href="https://open-meteo.com/" '
+            'target="_blank" rel="noopener noreferrer">Weather data by Open-Meteo</a>'
+            '</section>'
+        )
+    days = []
+    for day in forecast:
+        date = html.escape(day["date"])
+        icon = html.escape(day["icon"])
+        condition = html.escape(day["condition"])
+        high = html.escape(str(day["high"]))
+        low = html.escape(str(day["low"]))
+        precipitation = (
+            html.escape(str(day["precipitation"]))
+            if day["precipitation"] is not None else "—"
+        )
+        days.append(
+            '<article class="forecast-day">'
+            f'<h3>{date}</h3>'
+            f'<span class="forecast-icon" aria-hidden="true">{icon}</span>'
+            f'<span class="forecast-condition">{condition}</span>'
+            f'<p class="forecast-temperature"><strong>{high}°</strong> / {low}°</p>'
+            f'<p class="forecast-rain">Rain {precipitation}{"%" if precipitation != "—" else ""}</p>'
+            '</article>'
+        )
+    return (
+        '<section class="forecast" aria-labelledby="forecast-title">'
+        '<div class="forecast-heading">'
+        '<h2 id="forecast-title">Atlanta 7-day forecast</h2>'
+        '<span>Atlanta, Georgia</span>'
+        '</div>'
+        f'<div class="forecast-grid">{"".join(days)}</div>'
+        '<a class="forecast-credit" href="https://open-meteo.com/" '
+        'target="_blank" rel="noopener noreferrer">Weather data by Open-Meteo</a>'
+        '</section>'
+    )
+
+
 def render_page(
     ranked_stories: list[tuple[Story, str]],
     updated: datetime,
     live_news_url: str = "",
     source_names: list[str] | None = None,
+    forecast: list[dict] | None = None,
 ) -> str:
     sections, atlanta_stories = group_sections(ranked_stories)
     if source_names is None:
@@ -480,6 +617,22 @@ def render_page(
     .feed-sources summary {{ width: fit-content; color: #58a6ff; font-size: .78rem; font-weight: 650; cursor: pointer; }}
     .feed-sources ul {{ display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }}
     .feed-sources li {{ border: 1px solid #30363d; border-radius: 999px; padding: 4px 8px; background: #161b22; color: #c9d1d9; font-size: .72rem; }}
+    .forecast {{ margin: 0 0 18px; border: 1px solid #30363d; border-radius: 13px; padding: 14px; background: #161b22; }}
+    .forecast-heading {{ display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }}
+    .forecast-heading h2 {{ margin: 0; font-size: 1rem; }}
+    .forecast-heading > span {{ color: #8b949e; font-size: .75rem; }}
+    .forecast-grid {{ display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }}
+    .forecast-day {{ display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 5px; border: 1px solid #30363d; border-radius: 10px; padding: 10px 5px; background: #0d1117; text-align: center; }}
+    .forecast-day h3, .forecast-temperature, .forecast-rain {{ margin: 0; }}
+    .forecast-day h3 {{ font-size: .72rem; }}
+    .forecast-icon {{ font-size: 1.25rem; line-height: 1.3; }}
+    .forecast-condition {{ min-height: 2em; color: #8b949e; font-size: .65rem; line-height: 1.3; }}
+    .forecast-temperature {{ font-size: .72rem; white-space: nowrap; }}
+    .forecast-temperature strong {{ color: #e6edf3; }}
+    .forecast-rain {{ color: #8b949e; font-size: .65rem; }}
+    .forecast-unavailable {{ margin: 0; color: #8b949e; font-size: .8rem; }}
+    .forecast-credit {{ display: inline-block; margin-top: 10px; color: #8b949e; font-size: .68rem; text-decoration: none; }}
+    .forecast-credit:hover, .forecast-credit:focus-visible {{ color: #58a6ff; text-decoration: underline; }}
     .refresh-button {{ flex: 0 0 auto; min-height: 44px; border: 1px solid #30363d; border-radius: 999px; padding: 0 16px; background: #21262d; color: #e6edf3; font: inherit; font-size: .85rem; font-weight: 650; cursor: pointer; }}
     .refresh-button:hover, .refresh-button:focus-visible {{ border-color: #58a6ff; outline: none; }}
     .section-nav {{ position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 16px; padding: 10px 16px; background: #0d1117ed; backdrop-filter: blur(12px); scrollbar-width: none; }}
@@ -523,6 +676,7 @@ def render_page(
     footer {{ color: #8b949e; font-size: .74rem; line-height: 1.5; padding: 10px 4px; }}
     @media (max-width: 700px) {{
       main {{ max-width: 760px; }}
+      .forecast-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(88px, 1fr); grid-template-columns: none; overflow-x: auto; padding-bottom: 4px; scrollbar-color: #30363d transparent; }}
       .regional-grid {{ grid-auto-flow: column; grid-auto-columns: minmax(84vw, 1fr); grid-template-columns: none; overflow-x: auto; margin: 0 -16px 22px; padding: 0 16px 10px; scroll-snap-type: x mandatory; scrollbar-color: #30363d transparent; }}
       .regional-grid .news-section {{ scroll-snap-align: start; }}
     }}
@@ -538,6 +692,7 @@ def render_page(
       <p>Top stories from the U.S., Europe, the Middle East, and Atlanta.</p>
       {source_disclosure}
     </header>
+    {render_forecast(forecast)}
     <nav class="section-nav" aria-label="News sections">
       <a href="#us">US</a>
       <a href="#europe">Europe</a>
@@ -652,6 +807,11 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
 
     now = datetime.now(timezone.utc)
     ranked = rank_stories(cluster_articles(articles), keywords, now, region_keywords)
+    try:
+        forecast = fetch_atlanta_forecast()
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+        print(f"Warning: Atlanta forecast unavailable: {exc}", file=sys.stderr)
+        forecast = None
     output_dir.mkdir(parents=True, exist_ok=True)
     live_news_url = os.environ.get("LIVE_NEWS_URL", "").strip()
     if live_news_url and safe_link(live_news_url) != live_news_url:
@@ -659,7 +819,13 @@ def build_dashboard(config_path: Path, output_dir: Path) -> int:
     if live_news_url and urlsplit(live_news_url).scheme != "https":
         raise ValueError("LIVE_NEWS_URL must use HTTPS.")
     (output_dir / "index.html").write_text(
-        render_page(ranked, now, live_news_url, [feed["name"] for feed in feeds]),
+        render_page(
+            ranked,
+            now,
+            live_news_url,
+            [feed["name"] for feed in feeds],
+            forecast,
+        ),
         encoding="utf-8",
     )
     (output_dir / "feeds.json").write_text(

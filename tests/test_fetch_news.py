@@ -1,4 +1,5 @@
 import json
+from unittest.mock import Mock
 from types import SimpleNamespace
 import tempfile
 import unittest
@@ -18,6 +19,7 @@ from fetch_news import (
     rank_stories,
     render_page,
     render_card,
+    fetch_atlanta_forecast,
 )
 
 
@@ -99,6 +101,55 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("<li>The Guardian</li>", page)
         self.assertNotIn("ranked by outlet coverage", page)
 
+    def test_atlanta_forecast_appears_above_the_news_sections(self):
+        forecast = [{
+            "date": "Today",
+            "condition": "Clear",
+            "icon": "☀️",
+            "high": 70,
+            "low": 55,
+            "precipitation": 20,
+        }]
+        page = render_page([], self.now, forecast=forecast)
+        self.assertIn("Atlanta 7-day forecast", page)
+        self.assertIn("Atlanta, Georgia", page)
+        self.assertIn("Rain 20%", page)
+        self.assertIn("Weather data by Open-Meteo", page)
+        self.assertLess(page.index('class="forecast"'), page.index('class="latest-strip"'))
+
+    def test_forecast_fallback_is_visible_when_weather_is_unavailable(self):
+        page = render_page([], self.now)
+        self.assertIn("Forecast unavailable right now.", page)
+        self.assertIn("https://open-meteo.com/", page)
+
+    def test_forecast_api_returns_seven_formatted_days(self):
+        response = Mock()
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.read.return_value = json.dumps({
+            "daily": {
+                "time": [
+                    "2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26",
+                    "2026-11-27", "2026-11-28", "2026-11-29",
+                ],
+                "weather_code": [3, 51, 53, 51, 3, 3, 3],
+                "temperature_2m_max": [66.5, 59, 49.6, 61.1, 54, 63.5, 67.2],
+                "temperature_2m_min": [51.7, 44.8, 43.5, 43.1, 38.7, 44.6, 48],
+                "precipitation_probability_max": [15, 4, 82, 82, 1, 1, 13],
+            },
+        }).encode("utf-8")
+        with patch("fetch_news.urllib.request.urlopen", return_value=response) as urlopen:
+            forecast = fetch_atlanta_forecast()
+
+        self.assertEqual(len(forecast), 7)
+        self.assertEqual(forecast[0]["date"], "Today")
+        self.assertEqual(forecast[1]["date"], "Tue, Nov 24")
+        self.assertEqual(forecast[0]["condition"], "Cloudy")
+        self.assertEqual(forecast[0]["high"], 66)
+        self.assertEqual(forecast[0]["low"], 52)
+        self.assertEqual(forecast[0]["precipitation"], 15)
+        self.assertEqual(urlopen.call_args.kwargs["timeout"], 8)
+
     def test_story_card_links_headline_and_each_source_to_publisher(self):
         lead = self.article("Matched headline", "Outlet A", summary="Brief RSS context")
         lead.link = "https://outlet-a.example/story"
@@ -124,7 +175,8 @@ class DashboardTests(unittest.TestCase):
             with patch.dict("sys.modules", {"yaml": SimpleNamespace(safe_load=json.loads)}), \
                     patch("fetch_news.fetch_feed", return_value=[
                         self.article("Latest headline", "Example News")
-                    ]):
+                    ]), \
+                    patch("fetch_news.fetch_atlanta_forecast", side_effect=TimeoutError):
                 build_dashboard(config, output)
 
             feeds = json.loads((output / "feeds.json").read_text(encoding="utf-8"))
@@ -135,6 +187,7 @@ class DashboardTests(unittest.TestCase):
             page = (output / "index.html").read_text(encoding="utf-8")
             self.assertIn("Sources (1)", page)
             self.assertIn("<li>Example News</li>", page)
+            self.assertIn("Forecast unavailable right now.", page)
             self.assertFalse((output / "articles").exists())
 
     def test_feed_summaries_are_cleaned_and_capped(self):

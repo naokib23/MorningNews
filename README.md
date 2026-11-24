@@ -35,6 +35,8 @@ Article cards show an image when the RSS/Atom entry includes media metadata, an 
 
 The header includes a compact, expandable list of configured outlets. Story headlines link directly to the publisher article, and each card ends with clickable source links for the outlets that covered the story.
 
+The dashboard also shows a seven-day Atlanta, Georgia forecast from Open-Meteo, refreshed with each scheduled or manually triggered dashboard build. If the weather service is unavailable, the rest of the dashboard still deploys and the forecast area displays an unavailable message.
+
 The Atlanta section uses verified local RSS feeds from FOX 5 Atlanta, WSB-TV, 11Alive, and Atlanta News First. The requested Atlanta Voice page and its feed endpoints returned HTTP 403 during validation, so it is omitted rather than scraped; it can be added if a public official RSS/Atom feed becomes available.
 
 The provided outlet list contained 27 outlets. Twenty-one had official RSS/Atom endpoints returning feed XML when checked for this setup. These six were omitted because a usable official feed could not be validated:
