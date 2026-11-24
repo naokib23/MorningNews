@@ -100,7 +100,8 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("assets-type=\"stocks\"", page)
         self.assertIn("item-size=\"compact\"", page)
         self.assertIn("chart-size=\"compact\"", page)
-        self.assertIn(".market-widget { overflow: hidden; min-height: 300px;", page)
+        self.assertIn(".market-widget { height: 300px; overflow: hidden;", page)
+        self.assertIn(".market-widget tv-market-overview { display: block; height: 100%;", page)
         self.assertIn(
             'src="https://widgets.tradingview-widget.com/w/en/tv-market-overview.js"',
             page,
