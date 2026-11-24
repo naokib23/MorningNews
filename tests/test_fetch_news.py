@@ -1,4 +1,5 @@
 import json
+import urllib.error
 from unittest.mock import Mock
 from types import SimpleNamespace
 import tempfile
@@ -234,7 +235,17 @@ class DashboardTests(unittest.TestCase):
                 "precipitation_probability_max": [15, 4, 82, 82, 1, 1, 13],
             },
         }).encode("utf-8")
-        with patch("fetch_news.urllib.request.urlopen", return_value=response) as urlopen:
+        temporary_error = urllib.error.HTTPError(
+            "https://api.open-meteo.com/v1/forecast",
+            503,
+            "Service Unavailable",
+            {},
+            None,
+        )
+        with patch(
+            "fetch_news.urllib.request.urlopen",
+            side_effect=[temporary_error, response],
+        ) as urlopen, patch("fetch_news.time.sleep") as sleep:
             forecast = fetch_atlanta_forecast()
 
         self.assertEqual(len(forecast), 7)
@@ -245,7 +256,9 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(forecast[0]["high"], 66)
         self.assertEqual(forecast[0]["low"], 52)
         self.assertEqual(forecast[0]["precipitation"], 15)
+        self.assertEqual(urlopen.call_count, 2)
         self.assertEqual(urlopen.call_args.kwargs["timeout"], 8)
+        sleep.assert_called_once_with(1)
 
     def test_story_card_links_headline_and_each_source_to_publisher(self):
         lead = self.article("Matched headline", "Outlet A", summary="Brief RSS context")

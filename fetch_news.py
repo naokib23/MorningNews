@@ -12,6 +12,7 @@ import math
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -365,8 +366,15 @@ def fetch_atlanta_forecast(timeout: int = 8) -> list[dict]:
         ATLANTA_FORECAST_URL,
         headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        payload = json.loads(response.read())
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                payload = json.loads(response.read())
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code not in {500, 502, 503, 504} or attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
 
     daily = payload.get("daily") if isinstance(payload, dict) else None
     fields = (
